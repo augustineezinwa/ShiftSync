@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: #0f1419;
+  --surface-elevated: #1a2332;
+  --border: #2d3a4f;
+  --accent: #3b82f6;
+  --muted: #64748b;
+}
+
+body {
+  @apply bg-surface text-gray-100 antialiased;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
