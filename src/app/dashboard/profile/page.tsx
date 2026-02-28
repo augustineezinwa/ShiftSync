@@ -1,5 +1,6 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { AvailabilityEditor } from "@/components/dashboard/AvailabilityEditor";
 import { getStaff, SKILLS, LOCATIONS } from "@/lib/mock-data";
 
 interface PageProps {
@@ -63,6 +64,12 @@ export default async function ProfilePage({ searchParams }: PageProps) {
         </dl>
         <p className="mt-4 text-sm text-muted">Notification preferences: In-app (MVP).</p>
       </Card>
+
+      {user.role === "staff" && (
+        <div className="mt-6">
+          <AvailabilityEditor initial={user.availability ?? {}} />
+        </div>
+      )}
     </>
   );
 }

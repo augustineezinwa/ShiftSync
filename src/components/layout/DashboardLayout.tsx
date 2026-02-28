@@ -5,11 +5,12 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   role: Role;
   userId?: string | null;
+  query?: string;
   title?: string;
 }
 
-export function DashboardLayout({ children, role, userId, title }: DashboardLayoutProps) {
-  const q = userId ? `?role=${role}&userId=${userId}` : `?role=${role}`;
+export function DashboardLayout({ children, role, userId, query = "", title }: DashboardLayoutProps) {
+  const q = query || (userId ? `?role=${role}&userId=${userId}` : `?role=${role}`);
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar role={role} query={q} />

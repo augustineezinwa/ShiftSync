@@ -31,8 +31,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const query = "?" + searchParams.toString();
   return (
-    <DashboardLayout role={role} userId={userId}>
+    <DashboardLayout role={role} userId={userId} query={query}>
       {children}
     </DashboardLayout>
   );
