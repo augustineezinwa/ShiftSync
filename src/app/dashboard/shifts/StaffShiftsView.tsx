@@ -9,18 +9,23 @@ import {
   formatWeekRangeLabel,
   weekRangeToValue,
   valueToWeekRange,
-  CURRENT_WEEK_INDEX,
+  isCurrentWeek,
   type WeekRange,
 } from "@/lib/week-ranges";
 
-const WEEK_OPTIONS = getUpcomingWeekRanges();
-const DEFAULT_WEEK_VALUE = WEEK_OPTIONS[CURRENT_WEEK_INDEX] ? weekRangeToValue(WEEK_OPTIONS[CURRENT_WEEK_INDEX]) : "";
+function getDefaultWeekValue(): string {
+  const opts = getUpcomingWeekRanges();
+  const current = opts.find(isCurrentWeek);
+  return current ? weekRangeToValue(current) : (opts[2] ? weekRangeToValue(opts[2]) : "");
+}
 
 export function StaffShiftsView() {
+  const weekOptions = getUpcomingWeekRanges();
+
   const [myShifts, setMyShifts] = useState<ApiShift[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedWeekValue, setSelectedWeekValue] = useState(DEFAULT_WEEK_VALUE);
+  const [selectedWeekValue, setSelectedWeekValue] = useState(getDefaultWeekValue);
 
   const loadMyShifts = useCallback(async (weekRange: WeekRange | null) => {
     setLoading(true);
@@ -62,9 +67,9 @@ export function StaffShiftsView() {
               onChange={(e) => setSelectedWeekValue(e.target.value)}
               className="rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             >
-              {WEEK_OPTIONS.map((range, index) => (
+              {weekOptions.map((range) => (
                 <option key={weekRangeToValue(range)} value={weekRangeToValue(range)}>
-                  {formatWeekRangeLabel(range, index === CURRENT_WEEK_INDEX)}
+                  {formatWeekRangeLabel(range, isCurrentWeek(range))}
                 </option>
               ))}
             </select>

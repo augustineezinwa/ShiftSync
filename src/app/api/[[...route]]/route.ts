@@ -23,9 +23,12 @@ import UserSettingController from "@/server/controllers/UserSettingController";
 import { allowOnlyManagerMiddleware } from "@/server/middlewares/allowOnlyManager";
 import ShiftController from "@/server/controllers/ShiftController";
 import { enforceLimitMiddleware } from "@/server/middlewares/enforceLimit";
-import { createShiftSchema, publishShiftSchema, updateShiftSchema } from "@/server/validations/shift";
+import { createShiftSchema, parseAndValidateShiftTimes, publishShiftSchema, updateShiftSchema } from "@/server/validations/shift";
+import { attachLocationMiddleware } from "@/server/middlewares/attachLocation";
 import { ZodError } from "zod";
 import { validate } from "@/server/validations/utils";
+import { parseToLocalTimeMiddleware } from "@/server/middlewares/parseToLocalTime";
+import { validateTimeMiddleware } from "@/server/middlewares/validateTime";
 
 type Bindings = {
   db: typeof db
@@ -203,10 +206,15 @@ const appRoutes = app
   .post(
     "/shifts",
     validate(createShiftSchema),
+    attachLocationMiddleware,
+    parseToLocalTimeMiddleware,
+    validateTimeMiddleware,
     checkAuthMiddleware,
     allowOnlyManagerMiddleware,
     async (c) => {
-      const { locationId, skillId, startTime, endTime, headcount } = c.req.valid("json");
+      const { locationId, skillId, headcount } = c.req.valid("json");
+      const startTime = c.get("startTimeLocal");
+      const endTime = c.get("endTimeLocal");
       const shift = await ShiftController.createShift(locationId, skillId, startTime, endTime, headcount);
       return c.json(shift);
     }
@@ -214,12 +222,17 @@ const appRoutes = app
   .put(
     "/shifts/:id",
     validate(updateShiftSchema),
+    attachLocationMiddleware,
+    parseToLocalTimeMiddleware,
+    validateTimeMiddleware,
     checkAuthMiddleware,
     allowOnlyManagerMiddleware,
     async (c) => {
       const id = Number(c.req.param("id"));
       if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
-      const { locationId, skillId, startTime, endTime, headcount } = c.req.valid("json");
+      const { locationId, skillId, headcount } = c.req.valid("json");
+      const startTime = c.get("startTimeLocal");
+      const endTime = c.get("endTimeLocal");
       const shift = await ShiftController.updateShift(id, locationId, skillId, startTime, endTime, headcount);
       return c.json(shift);
     }

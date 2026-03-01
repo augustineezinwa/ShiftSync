@@ -5,10 +5,6 @@ import { HTTPException } from "hono/http-exception";
 
 class ShiftController {
     static async createShift(locationId: number, skillId: number, startTime: Date, endTime: Date, headcount: number) {
-        // check hour limit
-        if (Math.abs(startTime.getTime() - endTime.getTime()) / (1000 * 60 * 60) > 12) {
-            throw new HTTPException(400, { message: "Shift duration must be less than 12 hours" });
-        }
         const [shift] = await db.insert(shifts).values({ locationId, skillId, startTime, endTime, headcount, status: "draft" }).returning();
         return shift;
     }

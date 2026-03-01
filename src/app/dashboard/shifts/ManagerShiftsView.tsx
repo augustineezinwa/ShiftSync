@@ -25,19 +25,25 @@ import {
   formatWeekRangeLabel,
   weekRangeToValue,
   valueToWeekRange,
-  CURRENT_WEEK_INDEX,
+  isCurrentWeek,
   type WeekRange,
 } from "@/lib/week-ranges";
 import { Plus } from "lucide-react";
 
 const DEFAULT_TIMEZONE = "UTC";
-const WEEK_OPTIONS = getUpcomingWeekRanges();
-const DEFAULT_WEEK_VALUE = WEEK_OPTIONS[CURRENT_WEEK_INDEX] ? weekRangeToValue(WEEK_OPTIONS[CURRENT_WEEK_INDEX]) : "";
+
+function getDefaultWeekValue(): string {
+  const opts = getUpcomingWeekRanges();
+  const current = opts.find(isCurrentWeek);
+  return current ? weekRangeToValue(current) : (opts[2] ? weekRangeToValue(opts[2]) : "");
+}
 
 export function ManagerShiftsView() {
   const { user } = useAuth();
   const managerLocations = user?.locations ? user.locations.map((l) => ({ id: l.id, name: l.name })) : [];
   const managerLocationIds = managerLocations.map((l) => l.id);
+
+  const weekOptions = getUpcomingWeekRanges();
 
   const [apiShifts, setApiShifts] = useState<ApiShift[]>([]);
   const [skills, setSkills] = useState<{ id: number; name: string }[]>([]);
@@ -50,7 +56,7 @@ export function ManagerShiftsView() {
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
-  const [selectedWeekValue, setSelectedWeekValue] = useState(DEFAULT_WEEK_VALUE);
+  const [selectedWeekValue, setSelectedWeekValue] = useState(getDefaultWeekValue);
   const [publishSubmitting, setPublishSubmitting] = useState(false);
 
   const loadShifts = useCallback(async (weekRange?: WeekRange | null) => {
@@ -149,11 +155,11 @@ export function ManagerShiftsView() {
                 onChange={(e) => setSelectedWeekValue(e.target.value)}
                 className="rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               >
-                {WEEK_OPTIONS.map((range, index) => (
-                  <option key={weekRangeToValue(range)} value={weekRangeToValue(range)}>
-                    {formatWeekRangeLabel(range, index === CURRENT_WEEK_INDEX)}
-                  </option>
-                ))}
+                {weekOptions.map((range) => (
+                        <option key={weekRangeToValue(range)} value={weekRangeToValue(range)}>
+                          {formatWeekRangeLabel(range, isCurrentWeek(range))}
+                        </option>
+                      ))}
               </select>
             </div>
             <Button

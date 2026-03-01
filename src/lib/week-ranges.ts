@@ -20,6 +20,12 @@ export function formatWeekRangeLabel(range: WeekRange, isCurrent?: boolean): str
 
 const NUM_PAST_WEEKS = 2;
 
+/** True if today (local date) falls within the given week range. */
+export function isCurrentWeek(range: WeekRange): boolean {
+  const today = format(new Date(), "yyyy-MM-dd");
+  return today >= range.start && today <= range.end;
+}
+
 /** Two weeks before current, current week (Monday–Sunday), and next numFuture weeks. */
 export function getUpcomingWeekRanges(numFutureWeeks = 11): WeekRange[] {
   const now = new Date();
