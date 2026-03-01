@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
+import { skills, users } from "@/server/db/schema";
 import bcrypt from "bcrypt";
 
 const SALT_ROUNDS = 10;
@@ -14,7 +14,13 @@ async function seed() {
         { name: "Admin X", email: "admin@gmail.com", password: await hashPassword("password"), role: "admin" },
         { name: "Manager Y", email: "manager@gmail.com", password: await hashPassword("password"), role: "manager" },
         { name: "Staff Z", email: "staff@gmail.com", password: await hashPassword("password"), role: "staff" },
-    ]);
+    ]).onConflictDoNothing();
+    await db.insert(skills).values([
+        { name: "cook" },
+        { name: "waiter" },
+        { name: "host" },
+        { name: "bartender" },
+    ]).onConflictDoNothing();
 }
 
 seed().then(() => {

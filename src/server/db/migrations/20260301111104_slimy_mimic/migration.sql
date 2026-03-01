@@ -1,0 +1,2 @@
+ALTER TABLE "users_availability" ALTER COLUMN "start_time" SET DATA TYPE time USING "start_time"::time;--> statement-breakpoint
+ALTER TABLE "users_availability" ALTER COLUMN "end_time" SET DATA TYPE time USING "end_time"::time;

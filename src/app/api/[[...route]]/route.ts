@@ -12,12 +12,14 @@ import ConfigController from "@/server/controllers/ConfigController";
 import { configSchema } from "@/server/validations/config";
 import { allowOnlyAdminMiddleware } from "@/server/middlewares/allowOnlyAdmin";
 import { DrizzleQueryError } from "drizzle-orm";
-import { assignSkillToUserSchema, createSkillSchema } from "@/server/validations/skill";
+import { assignSkillToMeSchema, assignSkillToUserSchema, createSkillSchema, updateSkillSchema } from "@/server/validations/skill";
 import SkillController from "@/server/controllers/SkillController";
-import { assignLocationToUserSchema, createLocationSchema } from "@/server/validations/location";
+import { assignLocationToUserSchema, createLocationSchema, updateLocationSchema } from "@/server/validations/location";
 import { LocationController } from "@/server/controllers/LocationController";
 import UserAvailabilityController from "@/server/controllers/UserAvailabilityController";
 import { createUserAvailabilitySchema, updateUserAvailabilitySchema } from "@/server/validations/availability";
+import { updateUserWeeklyHoursSchema } from "@/server/validations/userSetting";
+import UserSettingController from "@/server/controllers/UserSettingController";
 
 type Bindings = {
   db: typeof db
@@ -76,16 +78,40 @@ const appRoutes = app
     c.status(201);
     return c.json(config);
   })
+  .get("/skills", checkAuthMiddleware, async (c) => {
+    const list = await SkillController.getAllSkills();
+    return c.json(list);
+  })
   .post("/skills", zValidator("json", createSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
-    const { name } = await c.req.json();
-    const skill = await SkillController.createSkill(name);
+    const { name, isVerified } = await c.req.json();
+    const skill = await SkillController.createSkill(name, isVerified ?? false);
     c.status(201);
     return c.json(skill);
   })
+  .put("/skills/:id", zValidator("json", updateSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const { name, isVerified } = await c.req.json();
+    const skill = await SkillController.updateSkill(id, name, isVerified);
+    if (!skill) return c.json({ error: "Skill not found" }, 404);
+    return c.json(skill);
+  })
+  .get("/locations", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const list = await LocationController.getAllLocations();
+    return c.json(list);
+  })
   .post("/locations", zValidator("json", createLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
-    const { name, timezone, offset } = await c.req.json();
-    const location = await LocationController.createLocation(name, timezone, offset);
+    const { name, timezone, offset, isVerified } = await c.req.json();
+    const location = await LocationController.createLocation(name, timezone, offset, isVerified ?? false);
     c.status(201);
+    return c.json(location);
+  })
+  .put("/locations/:id", zValidator("json", updateLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const { name, timezone, offset, isVerified } = await c.req.json();
+    const location = await LocationController.updateLocation(id, name, timezone, offset, isVerified);
+    if (!location) return c.json({ error: "Location not found" }, 404);
     return c.json(location);
   })
   .put("/location/assign-user", zValidator("json", assignLocationToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
@@ -99,16 +125,38 @@ const appRoutes = app
     const userAvailability = await UserAvailabilityController.createUserAvailability(userId, dayOfWeek, startTime, endTime);
     return c.json(userAvailability);
   })
-  .put("/me/availability", zValidator("json", updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
-    const { dayOfWeek, startTime, endTime } = await c.req.json();
+  .get("/me/availability", checkAuthMiddleware, async (c) => {
     const userId = c.get("userId");
-    const userAvailability = await UserAvailabilityController.updateUserAvailability(userId, dayOfWeek, startTime, endTime);
+    const list = await UserAvailabilityController.getUserAvailabilities(userId);
+    return c.json(list);
+  })
+  .put("/me/availability", zValidator("json", updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
+    const { dayOfWeek, startTime, endTime, isActive } = await c.req.json();
+    const userId = c.get("userId");
+    const userAvailability = await UserAvailabilityController.updateUserAvailability(userId, dayOfWeek, isActive, startTime, endTime);
     return c.json(userAvailability);
   })
-  .put("/me/skills", zValidator("json", assignSkillToUserSchema), checkAuthMiddleware, async (c) => {
+  .put("/me/weekly-hours", zValidator("json", updateUserWeeklyHoursSchema), checkAuthMiddleware, async (c) => {
+    const { hoursPerWeek } = await c.req.json();
+    const userId = c.get("userId");
+    const userWeeklyHours = await UserSettingController.updateUserSetting(userId, hoursPerWeek);
+    return c.json(userWeeklyHours);
+  })
+  .get("/me/weekly-hours", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const userWeeklyHours = await UserSettingController.getUserSettingByUserId(userId);
+    return c.json(userWeeklyHours);
+  })
+  .put("/me/skills/assign", zValidator("json", assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
     const { skillId } = await c.req.json();
     const userId = c.get("userId");
     const skill = await SkillController.assignSkillToUser(userId, skillId);
+    return c.json(skill);
+  })
+  .put("/me/skills/unassign", zValidator("json", assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
+    const { skillId } = await c.req.json();
+    const userId = c.get("userId");
+    const skill = await SkillController.unassignSkillFromUser(userId, skillId);
     return c.json(skill);
   })
   .onError(async (error, c) => {
@@ -133,5 +181,6 @@ const appRoutes = app
 
 export const GET = handle(app);
 export const POST = handle(app);
+export const PUT = handle(app);
 
 export type AppRoutes = typeof appRoutes;

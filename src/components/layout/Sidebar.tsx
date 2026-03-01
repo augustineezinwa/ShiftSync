@@ -14,6 +14,7 @@ import {
   Clock,
   UserCircle,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { logout } from "@/lib/api";
 import type { Role } from "@/lib/mock-data";
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/overtime", label: "Overtime", icon: Clock, roles: ["admin", "manager"] },
   { href: "/dashboard/fairness", label: "Fairness", icon: FileText, roles: ["admin", "manager"] },
   { href: "/dashboard/audit", label: "Audit log", icon: FileText, roles: ["admin"] },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["admin"] },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell, roles: ["admin", "manager", "staff"] },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle, roles: ["admin", "manager", "staff"] },
 ];

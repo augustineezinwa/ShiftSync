@@ -1,11 +1,11 @@
 import { db } from "@/server/db";
 import { skills, usersSkills } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 class SkillController {
-    static async createSkill(name: string) {
-        const skill = await db.insert(skills).values({ name }).returning();
-        return skill[0];
+    static async createSkill(name: string, isVerified = false) {
+        const [skill] = await db.insert(skills).values({ name, isVerified }).returning();
+        return skill;
     }
 
     static async getSkill(id: number) {
@@ -14,9 +14,9 @@ class SkillController {
         });
     }
 
-    static async updateSkill(id: number, name: string) {
-        const updatedSkill = await db.update(skills).set({ name }).where(eq(skills.id, id)).returning();
-        return updatedSkill[0];
+    static async updateSkill(id: number, name: string, isVerified: boolean) {
+        const [updated] = await db.update(skills).set({ name, isVerified }).where(eq(skills.id, id)).returning();
+        return updated;
     }
 
     static async deleteSkill(id: number) {
@@ -25,12 +25,17 @@ class SkillController {
     }
 
     static async getAllSkills() {
-        return await db.query.skills.findMany();
+        return await db.select().from(skills).orderBy(skills.id);
     }
 
     static async assignSkillToUser(userId: number, skillId: number) {
         const assignedSkill = await db.insert(usersSkills).values({ userId, skillId }).onConflictDoNothing().returning();
         return assignedSkill[0];
+    }
+
+    static async unassignSkillFromUser(userId: number, skillId: number) {
+        const unassignedSkill = await db.delete(usersSkills).where(and(eq(usersSkills.userId, userId), eq(usersSkills.skillId, skillId))).returning();
+        return unassignedSkill[0];
     }
 }
 

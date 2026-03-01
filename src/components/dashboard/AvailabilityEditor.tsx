@@ -3,9 +3,21 @@
 import { useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { updateMeAvailability } from "@/lib/api";
 import { DAYS_OF_WEEK, type DayOfWeek, type WeeklyAvailability } from "@/lib/mock-data";
 
 const DEFAULT_SLOT = { start: "09:00", end: "17:00" };
+
+/** Monday = 0, Tuesday = 1, … Sunday = 6 */
+const DAY_OF_WEEK_INDEX: Record<DayOfWeek, number> = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6,
+};
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -23,14 +35,35 @@ export function AvailabilityEditor({ initial }: AvailabilityEditorProps) {
     }
     return acc;
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const setDay = (day: DayOfWeek, value: { start: string; end: string } | null) => {
     setAvailability((prev) => ({ ...prev, [day]: value }));
+    setError(null);
   };
 
-  const handleSave = () => {
-    // MVP: would persist to API
-    alert("Availability saved!");
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const payloads = DAYS_OF_WEEK.map((day) => {
+        const value = availability[day];
+        const isActive = value !== undefined && value !== null;
+        const dayOfWeek = DAY_OF_WEEK_INDEX[day];
+        return updateMeAvailability({
+          dayOfWeek,
+          isActive,
+          startTime: isActive ? value!.start : "00:00",
+          endTime: isActive ? value!.end : "00:00",
+        });
+      });
+      await Promise.all(payloads);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save availability");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -90,8 +123,11 @@ export function AvailabilityEditor({ initial }: AvailabilityEditorProps) {
           );
         })}
       </div>
-      <Button onClick={handleSave} className="mt-4">
-        Save availability
+      {error && (
+        <p className="mt-3 text-sm text-red-500">{error}</p>
+      )}
+      <Button onClick={handleSave} className="mt-4" disabled={saving}>
+        {saving ? "Saving…" : "Save availability"}
       </Button>
     </Card>
   );

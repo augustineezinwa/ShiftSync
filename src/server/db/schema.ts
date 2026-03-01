@@ -1,5 +1,5 @@
 import { sql, defineRelations } from "drizzle-orm";
-import { index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const rolesEnum = pgEnum("roles", ["admin", "manager", "staff"]);
 
@@ -28,11 +28,13 @@ export const locations = pgTable("locations", {
     offset: integer().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    isVerified: boolean("is_verified").notNull().default(false),
 });
 
 export const skills = pgTable("skills", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
-    name: text().notNull(),
+    name: text().notNull().unique(),
+    isVerified: boolean("is_verified").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -76,8 +78,9 @@ export const usersAvailability = pgTable("users_availability", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     userId: integer().references(() => users.id),
     dayOfWeek: integer().notNull(),
-    startTime: timestamp("start_time").notNull(),
-    endTime: timestamp("end_time").notNull(),
+    startTime: time("start_time").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    endTime: time("end_time").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -198,11 +201,17 @@ export const relations = defineRelations({ users, usersLocations, usersSkills, u
     users: {
         skills: r.many.skills({
             from: r.users.id.through(r.usersSkills.userId),
-            to: r.skills.id.through(r.usersSkills.skillId)
+            to: r.skills.id.through(r.usersSkills.skillId),
+            where: {
+                isVerified: true
+            }
         }),
         locations: r.many.locations({
             from: r.users.id.through(r.usersLocations.userId),
-            to: r.locations.id.through(r.usersLocations.locationId)
+            to: r.locations.id.through(r.usersLocations.locationId),
+            where: {
+                isVerified: true
+            }
         }),
         setting: r.one.usersSettings({
             from: r.users.id,
@@ -210,7 +219,7 @@ export const relations = defineRelations({ users, usersLocations, usersSkills, u
         }),
         availabilities: r.many.usersAvailability({
             from: r.users.id,
-            to: r.usersAvailability.userId
+            to: r.usersAvailability.userId,
         })
     },
 
