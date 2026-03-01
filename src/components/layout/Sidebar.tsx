@@ -13,7 +13,9 @@ import {
   ArrowLeftRight,
   Clock,
   UserCircle,
+  LogOut,
 } from "lucide-react";
+import { logout } from "@/lib/api";
 import type { Role } from "@/lib/mock-data";
 
 interface NavItem {
@@ -73,6 +75,16 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
           );
         })}
       </nav>
+      <div className="border-t border-border p-2">
+        <button
+          type="button"
+          onClick={() => logout()}
+          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-border/50 hover:text-gray-200"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

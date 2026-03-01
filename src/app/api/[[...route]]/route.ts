@@ -5,9 +5,7 @@ import { createUserSchema, loginUserSchema } from "@/server/validations/user";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
-import {
-  setCookie,
-} from 'hono/cookie'
+import { deleteCookie, setCookie } from 'hono/cookie';
 
 type Bindings = {
   db: typeof db
@@ -37,9 +35,11 @@ const appRoutes = app
       sameSite: "strict",
     });
     return c.json(result);
+  })
+  .post("/auth/logout", async (c) => {
+    deleteCookie(c, "token", { path: "/" });
+    return c.json({ ok: true });
   });
-
-
 
 export const GET = handle(app);
 export const POST = handle(app);
