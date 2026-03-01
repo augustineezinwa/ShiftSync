@@ -4,12 +4,18 @@ import { createMiddleware } from 'hono/factory'
 import { db } from '@/server/db';
 import jwt from 'jsonwebtoken';
 import { getCookie } from 'hono/cookie';
+import { locations } from '@/server/db/schema';
+
+type Location = typeof locations.$inferSelect;
+
+
 
 export const checkAuthMiddleware = createMiddleware<{
     Variables: {
         db: typeof db
         userId: number,
         role: string
+        locations: Location[]
     }
 }>(async (c, next) => {
     const token = getCookie(c, "token");
@@ -22,12 +28,16 @@ export const checkAuthMiddleware = createMiddleware<{
     }
     const user = await db.query.users.findFirst({
         where: { id: decoded.userId },
+        with: {
+            locations: true,
+        },
     });
     if (!user) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
     c.set('userId', user.id);
     c.set('role', user.role);
+    c.set('locations', user.locations);
     await next();
 })
 

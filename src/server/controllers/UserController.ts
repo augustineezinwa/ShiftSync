@@ -40,6 +40,16 @@ class UserController {
     return newUser[0];
   }
 
+  static async getAllUsers() {
+    return await db.query.users.findMany({
+      with: {
+        skills: true,
+        locations: true,
+        setting: true,
+      },
+    });
+  }
+
   /**
    * Compare a password with a hashed password
    * @param password - The password to compare

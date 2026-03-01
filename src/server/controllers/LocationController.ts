@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import { locations, usersLocations } from "@/server/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, and } from "drizzle-orm";
 
 export class LocationController {
     static async createLocation(name: string, timezone: string, offset: number, isVerified = false) {
@@ -25,5 +25,10 @@ export class LocationController {
     static async assignLocationToUser(userId: number, locationId: number) {
         const assignedLocation = await db.insert(usersLocations).values({ userId, locationId }).onConflictDoNothing().returning();
         return assignedLocation[0];
+    }
+
+    static async unassignLocationFromUser(userId: number, locationId: number) {
+        const unassignedLocation = await db.delete(usersLocations).where(and(eq(usersLocations.userId, userId), eq(usersLocations.locationId, locationId))).returning();
+        return unassignedLocation[0];
     }
 }

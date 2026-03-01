@@ -20,6 +20,11 @@ import UserAvailabilityController from "@/server/controllers/UserAvailabilityCon
 import { createUserAvailabilitySchema, updateUserAvailabilitySchema } from "@/server/validations/availability";
 import { updateUserWeeklyHoursSchema } from "@/server/validations/userSetting";
 import UserSettingController from "@/server/controllers/UserSettingController";
+import { allowOnlyManagerMiddleware } from "@/server/middlewares/allowOnlyManager";
+import ShiftController from "@/server/controllers/ShiftController";
+import { createShiftSchema, publishShiftSchema, updateShiftSchema } from "@/server/validations/shift";
+import { ZodError } from "zod";
+import { validate } from "@/server/validations/utils";
 
 type Bindings = {
   db: typeof db
@@ -30,13 +35,13 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
 const appRoutes = app
-  .post("/users", zValidator("json", createUserSchema), checkAuthMiddleware, async (c) => {
+  .post("/users", validate(createUserSchema), checkAuthMiddleware, async (c) => {
     const { email, password, role, name } = await c.req.json();
     const user = await UserController.createUser(name, email, password, role);
     c.status(201);
     return c.json(user);
   })
-  .post("/auth/login", zValidator("json", loginUserSchema), async (c) => {
+  .post("/auth/login", validate(loginUserSchema), async (c) => {
     const { email, password } = await c.req.json();
     const result = await UserController.loginUser(email, password);
     if (!result) {
@@ -55,6 +60,10 @@ const appRoutes = app
     deleteCookie(c, "token", { path: "/" });
     return c.json({ ok: true });
   })
+  .get("/users", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const list = await UserController.getAllUsers();
+    return c.json(list);
+  })
   .get("/auth/me", checkAuthMiddleware, async (c) => {
     const userId = c.get("userId");
     const user = await UserController.getUser(userId);
@@ -62,17 +71,21 @@ const appRoutes = app
     const { password: _p, ...me } = user;
     return c.json(me);
   })
+  .get("/config", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const list = await ConfigController.getAllConfigs();
+    return c.json(list);
+  })
   .get("/config/:key", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const key = c.req.param("key");
     const config = await ConfigController.getConfig(key)
     return c.json(config);
   })
-  .put("/config", zValidator("json", configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .put("/config", validate(configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const { key, value } = await c.req.json();
     const config = await ConfigController.updateConfig(key, value);
     return c.json(config);
   })
-  .post("/config", zValidator("json", configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .post("/config", validate(configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const { key, value } = await c.req.json();
     const config = await ConfigController.createConfig(key, value);
     c.status(201);
@@ -82,13 +95,13 @@ const appRoutes = app
     const list = await SkillController.getAllSkills();
     return c.json(list);
   })
-  .post("/skills", zValidator("json", createSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .post("/skills", validate(createSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const { name, isVerified } = await c.req.json();
     const skill = await SkillController.createSkill(name, isVerified ?? false);
     c.status(201);
     return c.json(skill);
   })
-  .put("/skills/:id", zValidator("json", updateSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .put("/skills/:id", validate(updateSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const id = Number(c.req.param("id"));
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
     const { name, isVerified } = await c.req.json();
@@ -100,13 +113,13 @@ const appRoutes = app
     const list = await LocationController.getAllLocations();
     return c.json(list);
   })
-  .post("/locations", zValidator("json", createLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .post("/locations", validate(createLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const { name, timezone, offset, isVerified } = await c.req.json();
     const location = await LocationController.createLocation(name, timezone, offset, isVerified ?? false);
     c.status(201);
     return c.json(location);
   })
-  .put("/locations/:id", zValidator("json", updateLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .put("/locations/:id", validate(updateLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const id = Number(c.req.param("id"));
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
     const { name, timezone, offset, isVerified } = await c.req.json();
@@ -114,12 +127,17 @@ const appRoutes = app
     if (!location) return c.json({ error: "Location not found" }, 404);
     return c.json(location);
   })
-  .put("/location/assign-user", zValidator("json", assignLocationToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .put("/location/assign-user", validate(assignLocationToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const { userId, locationId } = await c.req.json();
     const location = await LocationController.assignLocationToUser(userId, locationId);
     return c.json(location);
   })
-  .post("/me/availability", zValidator("json", createUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
+  .put("/location/unassign-user", validate(assignLocationToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { userId, locationId } = await c.req.json();
+    const location = await LocationController.unassignLocationFromUser(userId, locationId);
+    return c.json(location);
+  })
+  .post("/me/availability", validate(createUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
     const { dayOfWeek, startTime, endTime } = await c.req.json();
     const userId = c.get("userId");
     const userAvailability = await UserAvailabilityController.createUserAvailability(userId, dayOfWeek, startTime, endTime);
@@ -130,13 +148,13 @@ const appRoutes = app
     const list = await UserAvailabilityController.getUserAvailabilities(userId);
     return c.json(list);
   })
-  .put("/me/availability", zValidator("json", updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
+  .put("/me/availability", validate(updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
     const { dayOfWeek, startTime, endTime, isActive } = await c.req.json();
     const userId = c.get("userId");
     const userAvailability = await UserAvailabilityController.updateUserAvailability(userId, dayOfWeek, isActive, startTime, endTime);
     return c.json(userAvailability);
   })
-  .put("/me/weekly-hours", zValidator("json", updateUserWeeklyHoursSchema), checkAuthMiddleware, async (c) => {
+  .put("/me/weekly-hours", validate(updateUserWeeklyHoursSchema), checkAuthMiddleware, async (c) => {
     const { hoursPerWeek } = await c.req.json();
     const userId = c.get("userId");
     const userWeeklyHours = await UserSettingController.updateUserSetting(userId, hoursPerWeek);
@@ -147,37 +165,101 @@ const appRoutes = app
     const userWeeklyHours = await UserSettingController.getUserSettingByUserId(userId);
     return c.json(userWeeklyHours);
   })
-  .put("/me/skills/assign", zValidator("json", assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
+  .put("/user/assign-skill", validate(assignSkillToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { userId, skillId } = await c.req.json();
+    const result = await SkillController.assignSkillToUser(userId, skillId);
+    return c.json(result);
+  })
+  .put("/user/unassign-skill", validate(assignSkillToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { userId, skillId } = await c.req.json();
+    const result = await SkillController.unassignSkillFromUser(userId, skillId);
+    return c.json(result);
+  })
+  .put("/me/skills/assign", validate(assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
     const { skillId } = await c.req.json();
     const userId = c.get("userId");
     const skill = await SkillController.assignSkillToUser(userId, skillId);
     return c.json(skill);
   })
-  .put("/me/skills/unassign", zValidator("json", assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
+  .put("/me/skills/unassign", validate(assignSkillToMeSchema), checkAuthMiddleware, async (c) => {
     const { skillId } = await c.req.json();
     const userId = c.get("userId");
     const skill = await SkillController.unassignSkillFromUser(userId, skillId);
     return c.json(skill);
   })
+  .post(
+    "/shifts",
+    validate(createShiftSchema),
+    checkAuthMiddleware,
+    allowOnlyManagerMiddleware,
+    async (c) => {
+      const { locationId, skillId, startTime, endTime, headcount } = c.req.valid("json");
+      const shift = await ShiftController.createShift(locationId, skillId, startTime, endTime, headcount);
+      return c.json(shift);
+    }
+  )
+  .put(
+    "/shifts/:id",
+    validate(updateShiftSchema),
+    checkAuthMiddleware,
+    allowOnlyManagerMiddleware,
+    async (c) => {
+      const id = Number(c.req.param("id"));
+      if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+      const { locationId, skillId, startTime, endTime, headcount } = c.req.valid("json");
+      const shift = await ShiftController.updateShift(id, locationId, skillId, startTime, endTime, headcount);
+      return c.json(shift);
+    }
+  )
+  .get("/shifts", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const list = await ShiftController.getShifts();
+    return c.json(list);
+  })
+  .get("/shifts/:id", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const shift = await ShiftController.getShift(id);
+    return c.json(shift);
+  }).put("/shifts/publish", zValidator("json", publishShiftSchema), checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const { ids } = await c.req.json();
+    const list = await ShiftController.publishSchedule(ids);
+    return c.json(list);
+  })
   .onError(async (error, c) => {
     console.error(error);
+
+    if (error instanceof ZodError) {
+      const formattedIssues = error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      }));
+
+      return c.json(
+        {
+          error: "Validation failed",
+          issues: formattedIssues,
+        },
+        422
+      );
+    }
+
     if (error instanceof DrizzleQueryError) {
-      const errorObject = JSON.parse(JSON.stringify(error.cause))
-      if (errorObject.code === '23505') {
-        console.error(errorObject);
-        return c.json({ error: "resource already exists" }, 409);
+      const errorObject = JSON.parse(JSON.stringify(error.cause));
+      if (errorObject.code === "23505") {
+        return c.json({ error: "Resource already exists" }, 409);
       }
     }
+
     if (error instanceof TokenExpiredError) {
       return c.json({ error: "Token expired" }, 401);
     }
+
     if (error instanceof HTTPException) {
-      console.error(error.cause)
-      return error.getResponse()
+      return error.getResponse();
     }
-    console.error(error);
+
     return c.json({ error: "Internal server error" }, 500);
-  })
+  });
 
 export const GET = handle(app);
 export const POST = handle(app);

@@ -95,7 +95,7 @@ export const shifts = pgTable("shifts", {
     endTime: timestamp("end_time", { withTimezone: true }).notNull(),
     skillId: integer().references(() => skills.id),
     headcount: integer().notNull(),
-    status: shiftsStatusEnum().notNull(),
+    status: shiftsStatusEnum().notNull().default("draft"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -197,7 +197,7 @@ export const config = pgTable("config", {
  * relations
  * 
 */
-export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability, config }, (r) => ({
+export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability, config, shifts, usersShifts }, (r) => ({
     users: {
         skills: r.many.skills({
             from: r.users.id.through(r.usersSkills.userId),
@@ -237,6 +237,21 @@ export const relations = defineRelations({ users, usersLocations, usersSkills, u
 
     usersAvailability: {
         user: r.one.users()
+    },
+
+    shifts: {
+        location: r.one.locations({
+            from: r.shifts.locationId,
+            to: r.locations.id
+        }),
+        skill: r.one.skills({
+            from: r.shifts.skillId,
+            to: r.skills.id
+        }),
+        users: r.many.users({
+            from: r.shifts.id.through(r.usersShifts.shiftId),
+            to: r.users.id.through(r.usersShifts.userId),
+        })
     }
 })
 );

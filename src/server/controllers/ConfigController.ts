@@ -9,6 +9,10 @@ class ConfigController {
             where: { key },
         });
     }
+    static async getAllConfigs() {
+        return await db.query.config.findMany();
+    }
+
 
     static async updateConfig(key: string, value: number) {
         const updatedConfig = await db.update(config).set({ value }).where(eq(config.key, key)).returning();

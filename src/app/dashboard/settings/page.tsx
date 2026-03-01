@@ -12,12 +12,21 @@ import {
   Th,
   Td,
 } from "@/components/ui/Table";
-import { getSkills, createSkill, updateSkill, getLocations, createLocation, updateLocation } from "@/lib/api";
+import { getSkills, createSkill, updateSkill, getLocations, createLocation, updateLocation, getConfigs, createConfig, updateConfig } from "@/lib/api";
 import { LocationModal, type LocationFormValues } from "@/components/settings/LocationModal";
 import { Pencil, Plus } from "lucide-react";
 
 type SkillRow = { id: number; name: string; isVerified: boolean };
 type LocationRow = { id: number; name: string; timezone: string; offset: number; isVerified: boolean };
+type ConfigRow = { id: number; key: string; value: number };
+
+/** Convert DB key "x-y-z" to display "X Y Z" */
+function configKeyToDisplay(key: string): string {
+  return key
+    .split("-")
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(" ");
+}
 
 export default function SettingsPage() {
   const [skills, setSkills] = useState<SkillRow[]>([]);
@@ -35,6 +44,15 @@ export default function SettingsPage() {
   const [locationEdit, setLocationEdit] = useState<LocationRow | null>(null);
   const [locationSubmitting, setLocationSubmitting] = useState(false);
   const [locationsError, setLocationsError] = useState<string | null>(null);
+
+  const [configs, setConfigs] = useState<ConfigRow[]>([]);
+  const [configsLoading, setConfigsLoading] = useState(true);
+  const [configsError, setConfigsError] = useState<string | null>(null);
+  const [newConfigKey, setNewConfigKey] = useState("");
+  const [newConfigValue, setNewConfigValue] = useState<number>(0);
+  const [configSubmitting, setConfigSubmitting] = useState(false);
+  const [editingConfigKey, setEditingConfigKey] = useState<string | null>(null);
+  const [editConfigValue, setEditConfigValue] = useState<number>(0);
 
   const loadSkills = useCallback(async () => {
     setLoading(true);
@@ -71,6 +89,66 @@ export default function SettingsPage() {
   useEffect(() => {
     loadLocations();
   }, [loadLocations]);
+
+  const loadConfigs = useCallback(async () => {
+    setConfigsLoading(true);
+    setConfigsError(null);
+    try {
+      const list = await getConfigs();
+      setConfigs(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setConfigsError(e instanceof Error ? e.message : "Failed to load config");
+      setConfigs([]);
+    } finally {
+      setConfigsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfigs();
+  }, [loadConfigs]);
+
+  const handleAddConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const key = newConfigKey.trim().toLowerCase().replace(/\s+/g, "-");
+    if (!key) return;
+    setConfigSubmitting(true);
+    setConfigsError(null);
+    try {
+      await createConfig(key, newConfigValue);
+      setNewConfigKey("");
+      setNewConfigValue(0);
+      await loadConfigs();
+    } catch (e) {
+      setConfigsError(e instanceof Error ? e.message : "Failed to create config");
+    } finally {
+      setConfigSubmitting(false);
+    }
+  };
+
+  const startEditConfig = (row: ConfigRow) => {
+    setEditingConfigKey(row.key);
+    setEditConfigValue(row.value);
+  };
+
+  const cancelEditConfig = () => {
+    setEditingConfigKey(null);
+  };
+
+  const handleSaveConfig = async () => {
+    if (editingConfigKey == null) return;
+    setConfigSubmitting(true);
+    setConfigsError(null);
+    try {
+      await updateConfig(editingConfigKey, editConfigValue);
+      setEditingConfigKey(null);
+      await loadConfigs();
+    } catch (e) {
+      setConfigsError(e instanceof Error ? e.message : "Failed to update config");
+    } finally {
+      setConfigSubmitting(false);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,6 +423,113 @@ export default function SettingsPage() {
         onSubmit={handleLocationSubmit}
         isSubmitting={locationSubmitting}
       />
+
+      <Card className="mb-6">
+        <CardHeader>Config</CardHeader>
+        <p className="mb-4 text-sm text-muted">
+          Config keys are stored as <code className="rounded bg-border/50 px-1 py-0.5 text-xs">x-y-z</code> in the database and shown as &quot;X Y Z&quot; here. When adding, enter the key in <code className="rounded bg-border/50 px-1 py-0.5 text-xs">x-y-z</code> format.
+        </p>
+        {configsError && (
+          <p className="mb-4 text-sm text-red-500">{configsError}</p>
+        )}
+
+        <form onSubmit={handleAddConfig} className="mb-6 flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="config-key" className="mb-1 block text-xs text-muted">
+              Key (e.g. x-y-z)
+            </label>
+            <input
+              id="config-key"
+              type="text"
+              value={newConfigKey}
+              onChange={(e) => setNewConfigKey(e.target.value)}
+              placeholder="e.g. max-hours-per-week"
+              className="w-48 rounded border border-border bg-surface px-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div>
+            <label htmlFor="config-value" className="mb-1 block text-xs text-muted">
+              Value
+            </label>
+            <input
+              id="config-value"
+              type="number"
+              value={newConfigValue}
+              onChange={(e) => setNewConfigValue(Number(e.target.value) ?? 0)}
+              className="w-24 rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <Button type="submit" disabled={configSubmitting || !newConfigKey.trim()}>
+            {configSubmitting ? "Adding…" : "Add config"}
+          </Button>
+        </form>
+
+        {configsLoading ? (
+          <p className="text-sm text-muted">Loading config…</p>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <Th>Key</Th>
+                <Th>Value</Th>
+                <Th>Action</Th>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {configs.map((row) => (
+                <TableRow key={row.id}>
+                  <Td className="font-medium text-white">
+                    {configKeyToDisplay(row.key)}
+                  </Td>
+                  <Td>
+                    {editingConfigKey === row.key ? (
+                      <input
+                        type="number"
+                        value={editConfigValue}
+                        onChange={(e) => setEditConfigValue(Number(e.target.value) ?? 0)}
+                        className="w-24 rounded border border-border bg-surface px-2 py-1.5 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="text-gray-200">{row.value}</span>
+                    )}
+                  </Td>
+                  <Td>
+                    {editingConfigKey === row.key ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={handleSaveConfig}
+                          disabled={configSubmitting}
+                        >
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditConfig}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEditConfig(row)}
+                        className="rounded p-1.5 text-muted transition-colors hover:bg-border/50 hover:text-gray-200"
+                        aria-label="Edit config"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        {!configsLoading && configs.length === 0 && (
+          <p className="py-4 text-sm text-muted">No config entries yet. Add one above.</p>
+        )}
+      </Card>
     </>
   );
 }
