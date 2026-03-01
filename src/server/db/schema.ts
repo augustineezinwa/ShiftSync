@@ -176,13 +176,25 @@ export const notifications = pgTable("notifications", {
     index("notifications_user_id_index").on(table.userId),
 ]);
 
+export const config = pgTable("config", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    key: text().notNull(),
+    value: integer().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    uniqueIndex("config_unique").on(table.key),
+    index("config_key_index").on(table.key),
+    index("config_value_index").on(table.value),
+]);
+
 
 
 /** 
  * relations
  * 
 */
-export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability }, (r) => ({
+export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability, config }, (r) => ({
     users: {
         skills: r.many.skills({
             from: r.users.id.through(r.usersSkills.userId),

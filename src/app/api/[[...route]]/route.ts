@@ -8,6 +8,16 @@ import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { deleteCookie, setCookie } from 'hono/cookie';
 import { TokenExpiredError } from "jsonwebtoken";
+import ConfigController from "@/server/controllers/ConfigController";
+import { configSchema } from "@/server/validations/config";
+import { allowOnlyAdminMiddleware } from "@/server/middlewares/allowOnlyAdmin";
+import { DrizzleQueryError } from "drizzle-orm";
+import { assignSkillToUserSchema, createSkillSchema } from "@/server/validations/skill";
+import SkillController from "@/server/controllers/SkillController";
+import { assignLocationToUserSchema, createLocationSchema } from "@/server/validations/location";
+import { LocationController } from "@/server/controllers/LocationController";
+import UserAvailabilityController from "@/server/controllers/UserAvailabilityController";
+import { createUserAvailabilitySchema, updateUserAvailabilitySchema } from "@/server/validations/availability";
 
 type Bindings = {
   db: typeof db
@@ -47,7 +57,65 @@ const appRoutes = app
     const user = await UserController.getUser(userId);
     return c.json(user);
   })
+  .get("/config/:key", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const key = c.req.param("key");
+    const config = await ConfigController.getConfig(key)
+    return c.json(config);
+  })
+  .put("/config", zValidator("json", configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { key, value } = await c.req.json();
+    const config = await ConfigController.updateConfig(key, value);
+    return c.json(config);
+  })
+  .post("/config", zValidator("json", configSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { key, value } = await c.req.json();
+    const config = await ConfigController.createConfig(key, value);
+    c.status(201);
+    return c.json(config);
+  })
+  .post("/skills", zValidator("json", createSkillSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { name } = await c.req.json();
+    const skill = await SkillController.createSkill(name);
+    c.status(201);
+    return c.json(skill);
+  })
+  .post("/locations", zValidator("json", createLocationSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { name, timezone, offset } = await c.req.json();
+    const location = await LocationController.createLocation(name, timezone, offset);
+    c.status(201);
+    return c.json(location);
+  })
+  .put("/location/assign-user", zValidator("json", assignLocationToUserSchema), checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const { userId, locationId } = await c.req.json();
+    const location = await LocationController.assignLocationToUser(userId, locationId);
+    return c.json(location);
+  })
+  .post("/me/availability", zValidator("json", createUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
+    const { dayOfWeek, startTime, endTime } = await c.req.json();
+    const userId = c.get("userId");
+    const userAvailability = await UserAvailabilityController.createUserAvailability(userId, dayOfWeek, startTime, endTime);
+    return c.json(userAvailability);
+  })
+  .put("/me/availability", zValidator("json", updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
+    const { dayOfWeek, startTime, endTime } = await c.req.json();
+    const userId = c.get("userId");
+    const userAvailability = await UserAvailabilityController.updateUserAvailability(userId, dayOfWeek, startTime, endTime);
+    return c.json(userAvailability);
+  })
+  .put("/me/skills", zValidator("json", assignSkillToUserSchema), checkAuthMiddleware, async (c) => {
+    const { skillId } = await c.req.json();
+    const userId = c.get("userId");
+    const skill = await SkillController.assignSkillToUser(userId, skillId);
+    return c.json(skill);
+  })
   .onError(async (error, c) => {
+    if (error instanceof DrizzleQueryError) {
+      const errorObject = JSON.parse(JSON.stringify(error.cause))
+      if (errorObject.code === '23505') {
+        console.error(errorObject);
+        return c.json({ error: "resource already exists" }, 409);
+      }
+    }
     if (error instanceof TokenExpiredError) {
       return c.json({ error: "Token expired" }, 401);
     }

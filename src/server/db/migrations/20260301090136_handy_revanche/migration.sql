@@ -1,0 +1,1 @@
+ALTER TABLE "config" ALTER COLUMN "value" SET DATA TYPE integer USING "value"::integer;
