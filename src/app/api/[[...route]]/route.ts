@@ -41,9 +41,10 @@ const appRoutes = app
       return c.json({ error: "Invalid email or password" }, 401);
     }
     c.status(200);
+    const isProduction = process.env.NODE_ENV === "production";
     setCookie(c, "token", result?.token, {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
       sameSite: "strict",
     });
     return c.json(result);
@@ -55,7 +56,9 @@ const appRoutes = app
   .get("/auth/me", checkAuthMiddleware, async (c) => {
     const userId = c.get("userId");
     const user = await UserController.getUser(userId);
-    return c.json(user);
+    if (!user) return c.json(null, 404);
+    const { password: _p, ...me } = user;
+    return c.json(me);
   })
   .get("/config/:key", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
     const key = c.req.param("key");
@@ -109,6 +112,7 @@ const appRoutes = app
     return c.json(skill);
   })
   .onError(async (error, c) => {
+    console.error(error);
     if (error instanceof DrizzleQueryError) {
       const errorObject = JSON.parse(JSON.stringify(error.cause))
       if (errorObject.code === '23505') {
