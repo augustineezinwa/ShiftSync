@@ -1,43 +1,98 @@
-import Link from "next/link";
-import { Shield, UserCog, User } from "lucide-react";
+"use client";
+
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
-import { STAFF } from "@/lib/mock-data";
+import { Button } from "@/components/ui/Button";
+import { login } from "@/lib/api";
 
-const roleConfig = [
-  { role: "admin" as const, label: "Admin", desc: "Corporate oversight across all locations", icon: Shield, userId: "u1" },
-  { role: "manager" as const, label: "Manager", desc: "Run one or more locations, schedule & approve swaps", icon: UserCog, userId: "u2" },
-  { role: "staff" as const, label: "Staff", desc: "View shifts, request swaps, pick up shifts", icon: User, userId: "u4" },
-];
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-export default function HomePage() {
+  const mutation = useMutation({
+    mutationFn: () => login(email, password),
+    onSuccess: (data: Awaited<ReturnType<typeof login>>) => {
+      const { user } = data;
+      router.push(
+        `/dashboard?role=${user.role}&userId=${user.id}`
+      );
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate();
+  };
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-surface p-6">
-      <div className="mb-10 text-center">
-        <h1 className="text-3xl font-bold text-white">ShiftSync</h1>
-        <p className="mt-1 text-muted">Coastal Eats — Staff Scheduling</p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-white">ShiftSync</h1>
+          <p className="mt-1 text-sm text-muted">
+            Coastal Eats — Staff Scheduling
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>Sign in</CardHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-sm font-medium text-gray-300"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-1.5 block text-sm font-medium text-gray-300"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            {mutation.isError && (
+              <p className="text-sm text-danger">
+                {mutation.error instanceof Error
+                  ? mutation.error.message
+                  : "Login failed"}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? "Signing in…" : "Login"}
+            </Button>
+          </form>
+        </Card>
       </div>
-      <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-3">
-        {roleConfig.map(({ role, label, desc, icon: Icon, userId }) => {
-          const user = STAFF.find((s) => s.id === userId);
-          return (
-            <Link key={role} href={`/dashboard?role=${role}&userId=${userId}`}>
-              <Card className="h-full cursor-pointer transition-colors hover:border-accent/50 hover:bg-surfaceElevated/80">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-accent/20 p-2.5">
-                    <Icon className="h-5 w-5 text-accent" />
-                  </div>
-                  <div>
-                    <CardHeader className="mb-0 font-semibold text-white">{label}</CardHeader>
-                    <p className="text-xs text-muted">{user?.name ?? desc}</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-gray-400">{desc}</p>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-      <p className="mt-8 text-center text-xs text-muted">Select a role to open the dashboard (MVP — mock data)</p>
     </div>
   );
 }

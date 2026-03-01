@@ -31,3 +31,5 @@ export const checkAuthMiddleware = createMiddleware<{
     c.set('role', user.role);
     await next();
 })
+
+
