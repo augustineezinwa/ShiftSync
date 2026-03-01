@@ -10,7 +10,7 @@ import { deleteCookie, setCookie } from 'hono/cookie';
 import { TokenExpiredError } from "jsonwebtoken";
 import ConfigController from "@/server/controllers/ConfigController";
 import { configSchema } from "@/server/validations/config";
-import { allowOnlyAdminMiddleware } from "@/server/middlewares/allowOnlyAdmin";
+import { allowOnlyAdminMiddleware, allowAdminOrManagerMiddleware } from "@/server/middlewares/allowOnlyAdmin";
 import { DrizzleQueryError } from "drizzle-orm";
 import { assignSkillToMeSchema, assignSkillToUserSchema, createSkillSchema, updateSkillSchema } from "@/server/validations/skill";
 import SkillController from "@/server/controllers/SkillController";
@@ -22,6 +22,7 @@ import { updateUserWeeklyHoursSchema } from "@/server/validations/userSetting";
 import UserSettingController from "@/server/controllers/UserSettingController";
 import { allowOnlyManagerMiddleware } from "@/server/middlewares/allowOnlyManager";
 import ShiftController from "@/server/controllers/ShiftController";
+import { enforceLimitMiddleware } from "@/server/middlewares/enforceLimit";
 import { createShiftSchema, publishShiftSchema, updateShiftSchema } from "@/server/validations/shift";
 import { ZodError } from "zod";
 import { validate } from "@/server/validations/utils";
@@ -60,7 +61,7 @@ const appRoutes = app
     deleteCookie(c, "token", { path: "/" });
     return c.json({ ok: true });
   })
-  .get("/users", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+  .get("/users", checkAuthMiddleware, allowAdminOrManagerMiddleware, async (c) => {
     const list = await UserController.getAllUsers();
     return c.json(list);
   })
@@ -187,6 +188,18 @@ const appRoutes = app
     const skill = await SkillController.unassignSkillFromUser(userId, skillId);
     return c.json(skill);
   })
+  .put(
+    "/shifts/publish",
+    validate(publishShiftSchema),
+    checkAuthMiddleware,
+    allowOnlyManagerMiddleware,
+    enforceLimitMiddleware,
+    async (c) => {
+      const { ids } = c.req.valid("json");
+      const list = await ShiftController.publishSchedule(ids);
+      return c.json(list);
+    }
+  )
   .post(
     "/shifts",
     validate(createShiftSchema),
@@ -212,7 +225,9 @@ const appRoutes = app
     }
   )
   .get("/shifts", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
-    const list = await ShiftController.getShifts();
+    const weekStart = c.req.query("weekStart");
+    const weekEnd = c.req.query("weekEnd");
+    const list = await ShiftController.getShifts(weekStart ?? undefined, weekEnd ?? undefined);
     return c.json(list);
   })
   .get("/shifts/:id", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
@@ -220,9 +235,32 @@ const appRoutes = app
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
     const shift = await ShiftController.getShift(id);
     return c.json(shift);
-  }).put("/shifts/publish", zValidator("json", publishShiftSchema), checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
-    const { ids } = await c.req.json();
-    const list = await ShiftController.publishSchedule(ids);
+  })
+  .delete("/shifts/:id", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    await ShiftController.deleteShift(id);
+    return c.json({ ok: true });
+  })
+  .post("/shifts/:id/assign", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    const { userIds } = await c.req.json();
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const shift = await ShiftController.assignUsersToShift(id, userIds);
+    return c.json(shift);
+  })
+  .post("/shifts/:id/unassign", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const { userId } = await c.req.json();
+    const shift = await ShiftController.unassignUserFromShift(id, userId);
+    return c.json(shift);
+  })
+  .get("/me/shifts", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const weekStart = c.req.query("weekStart");
+    const weekEnd = c.req.query("weekEnd");
+    const list = await ShiftController.getMyShifts(userId, weekStart ?? undefined, weekEnd ?? undefined);
     return c.json(list);
   })
   .onError(async (error, c) => {
@@ -264,5 +302,6 @@ const appRoutes = app
 export const GET = handle(app);
 export const POST = handle(app);
 export const PUT = handle(app);
+export const DELETE = handle(app);
 
 export type AppRoutes = typeof appRoutes;

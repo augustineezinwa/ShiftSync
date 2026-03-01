@@ -222,14 +222,29 @@ export async function updateConfig(key: string, value: number) {
 
 // --- Shifts (manager) ---
 
-export async function getShifts() {
-    const res = await api.shifts.$get();
+export async function getShifts(params?: { weekStart?: string; weekEnd?: string }) {
+    const url =
+        params?.weekStart && params?.weekEnd
+            ? `/api/shifts?weekStart=${encodeURIComponent(params.weekStart)}&weekEnd=${encodeURIComponent(params.weekEnd)}`
+            : "/api/shifts";
+    const res = await fetch(url, { credentials: "include" });
     if (!res.ok) throw new Error("Failed to fetch shifts");
     return res.json();
 }
 
 /** Single shift type from GET /shifts response (array element) */
 export type ApiShift = Awaited<ReturnType<typeof getShifts>>[number];
+
+/** Shifts assigned to the current user (staff). Optional week filter; uses shift location timezone. */
+export async function getMyShifts(params?: { weekStart?: string; weekEnd?: string }) {
+    const url =
+        params?.weekStart && params?.weekEnd
+            ? `/api/me/shifts?weekStart=${encodeURIComponent(params.weekStart)}&weekEnd=${encodeURIComponent(params.weekEnd)}`
+            : "/api/me/shifts";
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error("Failed to fetch my shifts");
+    return res.json();
+}
 
 export async function getShift(id: number) {
     const res = await api.shifts[":id"].$get({ param: { id: String(id) } });
@@ -270,7 +285,6 @@ export async function createShift(payload: {
     endTime: string;
     headcount: number;
 }) {
-    console.log('I am here >>>>>')
     const res = await api.shifts.$post({ json: payload as Parameters<typeof api.shifts.$post>[0]["json"] });
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -304,8 +318,49 @@ export async function updateShift(
     return res.json();
 }
 
+export async function deleteShift(id: number) {
+    const res = await api.shifts[":id"].$delete({ param: { id: String(id) } });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to delete shift";
+        throw new Error(msg);
+    }
+}
+
 export async function publishShifts(ids: number[]) {
     const res = await api.shifts.publish.$put({ json: { ids } });
-    if (!res.ok) throw new Error("Failed to publish shifts");
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to publish schedule";
+        throw new Error(msg);
+    }
+    return res.json();
+}
+
+export async function assignUsersToShift(shiftId: number, userIds: number[]) {
+    const res = await fetch(`/api/shifts/${shiftId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userIds }),
+    });
+    if (!res.ok) throw new Error("Failed to assign users to shift");
+    return res.json();
+}
+
+export async function unassignUserFromShift(shiftId: number, userId: number) {
+    const res = await fetch(`/api/shifts/${shiftId}/unassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) throw new Error("Failed to unassign user from shift");
     return res.json();
 }

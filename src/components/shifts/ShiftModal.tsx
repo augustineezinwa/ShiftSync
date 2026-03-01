@@ -45,12 +45,6 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Convert datetime-local value to ISO string */
-function fromDatetimeLocal(value: string): string {
-  if (!value) return "";
-  return new Date(value).toISOString();
-}
-
 export function ShiftModal({
   open,
   onClose,
@@ -90,15 +84,14 @@ export function ShiftModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!locationId || !skillId) return;
-    const start = startTime ? fromDatetimeLocal(startTime) : new Date().toISOString();
-    const end = endTime ? fromDatetimeLocal(endTime) : new Date().toISOString();
+    if (!locationId || !skillId || !startTime || !endTime) return;
+    // Send raw datetime-local values (YYYY-MM-DDTHH:mm) so backend interprets them in the shift location's timezone
     try {
       await onSubmit({
         locationId,
         skillId,
-        startTime: start,
-        endTime: end,
+        startTime,
+        endTime,
         headcount: Math.max(1, headcount),
       });
       onClose();
@@ -206,6 +199,7 @@ export function ShiftModal({
               {getFieldError("endTime")}
             </p>
           )}
+          <p className="mt-1 text-xs text-muted">Times are in the selected location&apos;s timezone.</p>
         </div>
         <div>
           <label htmlFor="shift-headcount" className="mb-1 block text-xs text-muted">
