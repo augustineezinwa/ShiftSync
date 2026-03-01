@@ -3,8 +3,7 @@ import { Role } from '@/lib/mock-data';
 import { createMiddleware } from 'hono/factory'
 import { db } from '@/server/db';
 import jwt from 'jsonwebtoken';
-import { users } from '@/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { getCookie } from 'hono/cookie';
 
 export const checkAuthMiddleware = createMiddleware<{
     Variables: {
@@ -13,7 +12,7 @@ export const checkAuthMiddleware = createMiddleware<{
         role: string
     }
 }>(async (c, next) => {
-    const token = c.req.header('Cookie')?.split('token=')[1];
+    const token = getCookie(c, "token");
     if (!token) {
         return c.json({ error: 'Unauthorized' }, 401);
     }
@@ -22,7 +21,7 @@ export const checkAuthMiddleware = createMiddleware<{
         return c.json({ error: 'Unauthorized' }, 401);
     }
     const user = await db.query.users.findFirst({
-        where: eq(users.id, decoded.userId),
+        where: { id: decoded.userId },
     });
     if (!user) {
         return c.json({ error: 'Unauthorized' }, 401);

@@ -1,5 +1,4 @@
 import bcrypt from "bcrypt";
-import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
 import { db } from "@/server/db";
@@ -17,7 +16,7 @@ class UserController {
    */
   static async loginUser(email: string, password: string) {
     const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
+      where: { email },
     });
     if (!user) return null;
     const isPasswordValid = await this.isPasswordValid(password, user.password);
@@ -34,7 +33,7 @@ class UserController {
    */
   static async createUser(name: string, email: string, password: string, role: Role) {
     const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
+      where: { email },
     });
     if (user) return user;
     const newUser = await db.insert(users).values({ name, email, password, role }).returning();
@@ -49,6 +48,19 @@ class UserController {
    */
   static async isPasswordValid(password: string, hashedPassword: string) {
     return await bcrypt.compare(password, hashedPassword);
+  }
+
+
+  static async getUser(id: number) {
+    return await db.query.users.findFirst({
+      with: {
+        skills: true,
+        locations: true,
+        setting: true,
+        availabilities: true,
+      },
+      where: { id },
+    });
   }
 }
 

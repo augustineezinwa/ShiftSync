@@ -1,4 +1,5 @@
 import UserController from "@/server/controllers/UserController";
+import { HTTPException } from 'hono/http-exception'
 import { db } from "@/server/db";
 import { checkAuthMiddleware } from "@/server/middlewares/checkAuth";
 import { createUserSchema, loginUserSchema } from "@/server/validations/user";
@@ -6,6 +7,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { deleteCookie, setCookie } from 'hono/cookie';
+import { TokenExpiredError } from "jsonwebtoken";
 
 type Bindings = {
   db: typeof db
@@ -39,7 +41,23 @@ const appRoutes = app
   .post("/auth/logout", async (c) => {
     deleteCookie(c, "token", { path: "/" });
     return c.json({ ok: true });
-  });
+  })
+  .get("/auth/me", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const user = await UserController.getUser(userId);
+    return c.json(user);
+  })
+  .onError(async (error, c) => {
+    if (error instanceof TokenExpiredError) {
+      return c.json({ error: "Token expired" }, 401);
+    }
+    if (error instanceof HTTPException) {
+      console.error(error.cause)
+      return error.getResponse()
+    }
+    console.error(error);
+    return c.json({ error: "Internal server error" }, 500);
+  })
 
 export const GET = handle(app);
 export const POST = handle(app);

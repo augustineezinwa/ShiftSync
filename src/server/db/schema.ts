@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, defineRelations } from "drizzle-orm";
 import { index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const rolesEnum = pgEnum("roles", ["admin", "manager", "staff"]);
@@ -45,6 +45,8 @@ export const usersSkills = pgTable("users_skills", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     uniqueIndex("users_skills_unique").on(table.userId, table.skillId),
+    index("users_skills_user_id_index").on(table.userId),
+    index("users_skills_skill_id_index").on(table.skillId),
 ]);
 
 export const usersLocations = pgTable("users_locations", {
@@ -55,6 +57,8 @@ export const usersLocations = pgTable("users_locations", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     uniqueIndex("users_locations_unique").on(table.userId, table.locationId),
+    index("users_locations_user_id_index").on(table.userId),
+    index("users_locations_location_id_index").on(table.locationId),
 ]);
 
 export const usersSettings = pgTable("users_settings", {
@@ -65,6 +69,7 @@ export const usersSettings = pgTable("users_settings", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     uniqueIndex("users_settings_unique").on(table.userId),
+    index("users_settings_user_id_index").on(table.userId),
 ]);
 
 export const usersAvailability = pgTable("users_availability", {
@@ -77,6 +82,7 @@ export const usersAvailability = pgTable("users_availability", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     uniqueIndex("users_availability_unique").on(table.userId, table.dayOfWeek),
+    index("users_availability_user_id_index").on(table.userId),
 ]);
 
 export const shifts = pgTable("shifts", {
@@ -115,6 +121,9 @@ export const swapRequests = pgTable("swap_requests", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     index("swap_requests_expires_at_index").on(table.expiresAt),
+    index("swap_requests_requester_id_index").on(table.requesterId),
+    index("swap_requests_target_user_id_index").on(table.targetUserId),
+    index("swap_requests_user_shift_id_index").on(table.userShiftId),
 ]);
 
 export const onDuty = pgTable("on_duty", {
@@ -127,6 +136,8 @@ export const onDuty = pgTable("on_duty", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
     uniqueIndex("on_duty_unique").on(table.userId, table.userShiftId),
+    index("on_duty_user_id_index").on(table.userId),
+    index("on_duty_user_shift_id_index").on(table.userShiftId),
 ]);
 
 export const auditLogs = pgTable("audit_logs", {
@@ -164,3 +175,47 @@ export const notifications = pgTable("notifications", {
     index("notifications_entity_type_index").on(table.entityType),
     index("notifications_user_id_index").on(table.userId),
 ]);
+
+
+
+/** 
+ * relations
+ * 
+*/
+export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability }, (r) => ({
+    users: {
+        skills: r.many.skills({
+            from: r.users.id.through(r.usersSkills.userId),
+            to: r.skills.id.through(r.usersSkills.skillId)
+        }),
+        locations: r.many.locations({
+            from: r.users.id.through(r.usersLocations.userId),
+            to: r.locations.id.through(r.usersLocations.locationId)
+        }),
+        setting: r.one.usersSettings({
+            from: r.users.id,
+            to: r.usersSettings.userId
+        }),
+        availabilities: r.many.usersAvailability({
+            from: r.users.id,
+            to: r.usersAvailability.userId
+        })
+    },
+
+    locations: {
+        users: r.many.users()
+    },
+
+    skills: {
+        users: r.many.users()
+    },
+
+    usersSettings: {
+        user: r.one.users()
+    },
+
+    usersAvailability: {
+        user: r.one.users()
+    }
+})
+);
