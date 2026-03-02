@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import ShiftController from "../controllers/ShiftController";
+import { getFormattedUsersWithBulletPoints, getQualifiedUsersForShift } from "../utils/qualifiedList";
 
 const MIN_HOURS_BETWEEN_SHIFTS = 10;
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -32,10 +33,11 @@ export const assertMinHoursBetweenShiftsMiddleware = createMiddleware<{
 
     for (const existing of existingShifts) {
         if (inWindow(existing.startTime) || inWindow(existing.endTime)) {
+            const qualifiedUsers = await getQualifiedUsersForShift(Number(shiftId));
+            const qualifiedSection = getFormattedUsersWithBulletPoints(qualifiedUsers, "Qualified users:");
+            const baseMessage = `User must have at least ${MIN_HOURS_BETWEEN_SHIFTS} hours before this shift. They have an existing shift in that window.`;
             return c.json(
-                {
-                    error: `User must have at least ${MIN_HOURS_BETWEEN_SHIFTS} hours before this shift. They have an existing shift in that window.`,
-                },
+                { error: qualifiedSection ? `${baseMessage}\n${qualifiedSection}` : baseMessage },
                 400
             );
         }
