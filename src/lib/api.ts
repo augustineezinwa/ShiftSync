@@ -376,10 +376,21 @@ export async function unassignUserFromShift(shiftId: number, userId: number) {
 export async function getAssignUserStatus(
     userId: number,
     shiftId: number
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; warnings: string[] } | { ok: false; error: string }> {
     const res = await fetch(`/api/users/${userId}/shifts/${shiftId}/status`, { credentials: "include" });
-    if (res.ok) return { ok: true };
     const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+        const warnings =
+            data &&
+            typeof data === "object" &&
+            "warnings" in data &&
+            (data as any).warnings &&
+            typeof (data as any).warnings === "object" &&
+            Array.isArray((data as any).warnings.warnings)
+                ? ((data as any).warnings.warnings as string[])
+                : [];
+        return { ok: true, warnings };
+    }
     const error =
         data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
             ? (data as { error: string }).error

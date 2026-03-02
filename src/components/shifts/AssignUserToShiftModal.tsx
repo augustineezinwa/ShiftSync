@@ -38,6 +38,7 @@ export function AssignUserToShiftModal({
 }: AssignUserToShiftModalProps) {
   const [waitingList, setWaitingList] = useState<UserOption[]>([]);
   const [redList, setRedList] = useState<RedListItem[]>([]);
+  const [warningsByUserId, setWarningsByUserId] = useState<Record<number, string[]>>({});
   const [selectedId, setSelectedId] = useState<string>("");
   const [unassigningId, setUnassigningId] = useState<number | null>(null);
   const [statusLoadingId, setStatusLoadingId] = useState<number | null>(null);
@@ -46,6 +47,7 @@ export function AssignUserToShiftModal({
     if (open) {
       setWaitingList([]);
       setRedList([]);
+      setWarningsByUserId({});
       setSelectedId("");
     }
   }, [open]);
@@ -57,8 +59,16 @@ export function AssignUserToShiftModal({
     (u) => !assignedIds.has(u.id) && !waitingIds.has(u.id) && !redListIds.has(u.id)
   );
 
-  const addToWaitingList = (user: UserOption) => {
+  const addToWaitingList = (user: UserOption, warnings: string[]) => {
     setWaitingList((prev) => [...prev, user]);
+    setWarningsByUserId((prev) =>
+      warnings.length
+        ? { ...prev, [user.id]: warnings }
+        : (() => {
+            const { [user.id]: _removed, ...rest } = prev;
+            return rest;
+          })()
+    );
     setSelectedId("");
   };
 
@@ -76,6 +86,10 @@ export function AssignUserToShiftModal({
 
   const removeFromWaitingList = (id: number) => {
     setWaitingList((prev) => prev.filter((u) => u.id !== id));
+    setWarningsByUserId((prev) => {
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   const handleSelectUser = async (userId: number) => {
@@ -85,7 +99,7 @@ export function AssignUserToShiftModal({
     try {
       const result = await getAssignUserStatus(userId, shiftId);
       if (result.ok) {
-        addToWaitingList(user);
+        addToWaitingList(user, result.warnings ?? []);
       } else {
         addToRedList(user, result.error);
       }
@@ -173,22 +187,33 @@ export function AssignUserToShiftModal({
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted">Selected (click Assign to save)</p>
             <div className="flex w-full flex-col gap-2">
-              {waitingList.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex w-full items-center justify-between gap-2 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-300"
-                >
-                  <span className="font-medium">{user.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFromWaitingList(user.id)}
-                    className="rounded p-1 text-muted transition-colors hover:bg-white/20 hover:text-white"
-                    aria-label={`Remove ${user.name} from list`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+              {waitingList.map((user) => {
+                const warnings = warningsByUserId[user.id] ?? [];
+                return (
+                  <div key={user.id} className="flex w-full flex-col gap-1">
+                    <div className="flex w-full items-center justify-between gap-2 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-300">
+                      <span className="font-medium">{user.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromWaitingList(user.id)}
+                        className="rounded p-1 text-muted transition-colors hover:bg-white/20 hover:text-white"
+                        aria-label={`Remove ${user.name} from list`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {warnings.length > 0 && (
+                      <div className="rounded-md border border-yellow-400/60 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          {warnings.map((w, idx) => (
+                            <li key={idx}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

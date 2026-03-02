@@ -1,6 +1,7 @@
 import ShiftController from "../controllers/ShiftController";
 import { db } from "../db";
 import { users, skills, locations, usersAvailability, usersLocations } from "../db/schema";
+import { getDayOfWeekInTz, getTimeStringInTz } from "./timezone";
 
 type User = typeof users.$inferSelect & {
     skills: typeof skills.$inferSelect[];
@@ -10,29 +11,6 @@ type User = typeof users.$inferSelect & {
 
 const MIN_HOURS_BETWEEN_SHIFTS = 10;
 const MS_PER_HOUR = 60 * 60 * 1000;
-
-const WEEKDAY_TO_NUM: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-/** Get day of week (0=Sun, 1=Mon, ..., 6=Sat) in the given timezone. */
-function getDayOfWeekInTz(date: Date, timezone: string): number {
-    const short = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(date);
-    return WEEKDAY_TO_NUM[short] ?? 0;
-}
-
-/** Get time string HH:mm:ss in the given timezone from a Date. */
-function getTimeStringInTz(date: Date, timezone: string): string {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-        timeZone: timezone,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-    }).formatToParts(date);
-    const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
-    const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
-    const second = parts.find((p) => p.type === "second")?.value ?? "00";
-    return `${hour}:${minute}:${second}`;
-}
 
 /** Same as assertAvailability: shift (in shift TZ) falls completely within an active availability for that day. */
 function userAvailabilityCoversShift(

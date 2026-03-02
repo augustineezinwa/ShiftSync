@@ -287,7 +287,11 @@ const appRoutes = app
     return c.json(list);
   })
   .get("/users/:userId/shifts/:shiftId/status", checkAuthMiddleware, allowOnlyManagerMiddleware, attachUserProbeMiddleware, attachShiftMiddleware, assertSkillsMiddleware, assertLocationMiddleware, assertAvailabilityMiddleware, assertMinHoursBetweenShiftsMiddleware, checkDoubleBookingMiddleware, async (c) => {
-    return c.json({ status: "ok" });
+    const userId = Number(c.req.param("userId"));
+    const shiftId = Number(c.req.param("shiftId"));
+    if (Number.isNaN(userId) || Number.isNaN(shiftId)) return c.json({ error: "Invalid id" }, 400);
+    const warnings = await ShiftController.getComplianceWarningsForUser(userId, shiftId);
+    return c.json({ warnings, ok: true });
   })
   .get("/shifts/:shiftId/qualified-users", checkAuthMiddleware, async (c) => {
     const id = Number(c.req.param("shiftId"));
