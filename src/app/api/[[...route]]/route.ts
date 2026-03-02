@@ -33,6 +33,9 @@ import { attachUserProbeMiddleware } from "@/server/middlewares/attachUserProbe"
 import { attachShiftMiddleware } from "@/server/middlewares/attachShift";
 import { assertSkillsMiddleware } from "@/server/middlewares/assertSkills";
 import { assertLocationMiddleware } from "@/server/middlewares/assertLocation";
+import { assertAvailabilityMiddleware } from "@/server/middlewares/assertAvailability";
+import { assertMinHoursBetweenShiftsMiddleware } from "@/server/middlewares/assertMinHoursBetweenShifts";
+import { checkDoubleBookingMiddleware } from "@/server/middlewares/checkDoubleBooking";
 
 type Bindings = {
   db: typeof db
@@ -280,7 +283,7 @@ const appRoutes = app
     const list = await ShiftController.getMyShifts(userId, weekStart ?? undefined, weekEnd ?? undefined);
     return c.json(list);
   })
-  .get("/users/:userId/shifts/:shiftId/status", checkAuthMiddleware, allowOnlyManagerMiddleware, attachUserProbeMiddleware, attachShiftMiddleware, assertSkillsMiddleware, assertLocationMiddleware, async (c) => {
+  .get("/users/:userId/shifts/:shiftId/status", checkAuthMiddleware, allowOnlyManagerMiddleware, attachUserProbeMiddleware, attachShiftMiddleware, assertSkillsMiddleware, assertLocationMiddleware, assertAvailabilityMiddleware, assertMinHoursBetweenShiftsMiddleware, checkDoubleBookingMiddleware, async (c) => {
     return c.json({ status: "ok" });
   })
   .onError(async (error, c) => {

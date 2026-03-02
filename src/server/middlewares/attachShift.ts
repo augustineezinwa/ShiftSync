@@ -8,6 +8,7 @@ export const attachShiftMiddleware = createMiddleware<{
         shiftStartTime: Date | null;
         shiftEndTime: Date | null;
         shiftId: number | null;
+        shiftTimezone: string;
     };
 }>(async (c, next) => {
     const id = c.req.param("shiftId");
@@ -28,6 +29,7 @@ export const attachShiftMiddleware = createMiddleware<{
     c.set("shiftLocationId", shiftLocation?.id ?? null);
     c.set("shiftStartTime", shiftStartTime ?? null);
     c.set("shiftEndTime", shiftEndTime ?? null);
+    c.set("shiftTimezone", shiftLocation?.timezone ?? "UTC");
 
     await next();
 });

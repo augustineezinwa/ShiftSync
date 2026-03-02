@@ -125,6 +125,22 @@ class ShiftController {
         const idSet = new Set(assignedIds);
         return allMatching.filter((s) => idSet.has(s.id));
     }
+
+    /** Shifts the user is assigned to (id, startTime, endTime). Optionally exclude one shift (e.g. the one being assigned). */
+    static async getShiftsAssignedToUser(userId: number, excludeShiftId?: number): Promise<{ id: number; startTime: Date; endTime: Date }[]> {
+        const assignedRows = await db
+            .select({ shiftId: usersShifts.shiftId })
+            .from(usersShifts)
+            .where(eq(usersShifts.userId, userId));
+        let assignedIds = assignedRows.map((r) => r.shiftId);
+        if (excludeShiftId != null) assignedIds = assignedIds.filter((id) => id !== excludeShiftId);
+        if (assignedIds.length === 0) return [];
+        const rows = await db
+            .select({ id: shifts.id, startTime: shifts.startTime, endTime: shifts.endTime })
+            .from(shifts)
+            .where(inArray(shifts.id, assignedIds));
+        return rows;
+    }
 }
 
 export default ShiftController;
