@@ -321,8 +321,15 @@ const appRoutes = app
     const id = Number(c.req.param("id"));
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
     const { status } = c.req.valid("json");
-    const request = await RequestController.updateRequestStatus(id, status);
+    const userId = c.get("userId");
+    const request = await RequestController.updateRequestStatus(id, status, userId);
     return c.json(request);
+  })
+  .get("/my/pick-up-requests", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const locationIds = c.get("locations").map((l) => l.id);
+    const requests = await RequestController.getPickUpRequestsForUser(userId, locationIds);
+    return c.json(requests);
   })
   .onError(async (error, c) => {
     console.error(error);
@@ -344,6 +351,7 @@ const appRoutes = app
 
     if (error instanceof DrizzleQueryError) {
       const errorObject = JSON.parse(JSON.stringify(error.cause));
+      console.log(errorObject);
       if (errorObject.code === "23505") {
         return c.json({ error: "Resource already exists" }, 409);
       }

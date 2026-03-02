@@ -436,6 +436,15 @@ export async function getManagerRequests() {
     return res.json();
 }
 
+/** Pick-up requests available to the current user (same shape as MyRequest). */
+export async function getMyPickupRequests() {
+    const res = await api.my["pick-up-requests"].$get();
+    if (!res.ok) throw new Error("Failed to fetch pick-up requests");
+    return res.json();
+}
+
+export type PickupRequest = Awaited<ReturnType<typeof getMyPickupRequests>>[number];
+
 export type MyRequest = Awaited<ReturnType<typeof getMyRequests>>[number];
 
 export type RequestStatus =

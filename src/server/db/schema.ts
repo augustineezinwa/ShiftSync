@@ -129,7 +129,7 @@ export const swapRequests = pgTable("swap_requests", {
     index("swap_requests_target_user_id_index").on(table.targetUserId),
     index("swap_requests_user_shift_id_index").on(table.userShiftId),
     index("swap_requests_shift_id_index").on(table.shiftId),
-    uniqueIndex("swap_requests_unique").on(table.requesterId, table.shiftId),
+    uniqueIndex('swab_assignment_unique_requester_id').on(table.userShiftId, table.requesterId),
 ]);
 
 export const onDuty = pgTable("on_duty", {

@@ -1,7 +1,6 @@
 import { db } from "@/server/db";
 import { shifts, swapRequests, usersShifts } from "@/server/db/schema";
 import { and, asc, eq, exists, inArray } from "drizzle-orm";
-import { HTTPException } from "hono/http-exception";
 import { getQualifiedUsersForShift } from "../utils/qualifiedList";
 
 class ShiftController {

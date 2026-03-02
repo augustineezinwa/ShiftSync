@@ -2,6 +2,7 @@ import { db } from "@/server/db";
 import { shifts, swapRequests, usersShifts } from "../db/schema";
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import ShiftController from "./ShiftController";
 
 export type RequestStatus = "pending" | "pending_manager_approval" | "accepted" | "rejected" | "cancelled";
 
@@ -29,7 +30,7 @@ class RequestController {
             if (!shiftAssignment) {
                 throw new HTTPException(400, { message: "Requester is not assigned to this shift" });
             }
-            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId, status: "pending_manager_approval" }).returning();
+            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId }).returning();
             return request;
         }
     }
@@ -80,16 +81,20 @@ class RequestController {
         });
     }
 
-    static async updateRequestStatus(requestId: number, status: RequestStatus) {
+    static async updateRequestStatus(requestId: number, status: RequestStatus, userId: number) {
         const oldRequest = await this.getRequest(requestId);
         const [request] = await db.update(swapRequests).set({ status }).where(eq(swapRequests.id, requestId)).returning();
+
+        if (oldRequest?.status === "pending" && request.status === 'pending_manager_approval' && request.type === 'drop') {
+            await db.update(swapRequests).set({ targetUserId: userId }).where(eq(swapRequests.id, requestId));
+        }
 
 
         if (oldRequest?.status === "pending_manager_approval" && request.type === 'swap' && request.status === 'accepted') {
             await db.update(usersShifts).set({ userId: Number(request.requesterId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
         } else if (oldRequest?.status === "pending_manager_approval" && request.type === 'drop' && request.status === 'accepted') {
             await db.update(swapRequests).set({ userShiftId: null }).where(eq(swapRequests.shiftId, request.shiftId));
-            await db.delete(usersShifts).where(eq(usersShifts.id, Number(request.userShiftId)));
+            await db.update(usersShifts).set({ userId: Number(request.targetUserId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
         }
 
         return request;
@@ -101,6 +106,30 @@ class RequestController {
                 requesterId: requesterId,
                 status: {
                     in: ["pending", "pending_manager_approval"]
+                }
+            }
+        });
+    }
+
+    static async getPickUpRequestsForUser(userId: number, locationIds: number[]) {
+        const qualifiedShifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
+        const shiftIds = qualifiedShifts.map((s) => s.id);
+        return await db.query.swapRequests.findMany({
+            with: {
+                shift: {
+                    with: {
+                        location: true
+                    }
+                },
+                targetUser: true,
+                requester: true
+            },
+            where: {
+                status: {
+                    in: ["pending", "pending_manager_approval", "accepted", "rejected", "cancelled"]
+                },
+                shiftId: {
+                    in: shiftIds
                 }
             }
         });
