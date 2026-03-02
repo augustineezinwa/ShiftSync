@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { db } from "@/server/db";
 import { skills, users } from "@/server/db/schema";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 const SALT_ROUNDS = 10;
 
