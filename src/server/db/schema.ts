@@ -116,7 +116,8 @@ export const swapRequests = pgTable("swap_requests", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     requesterId: integer().references(() => users.id).notNull(),
     type: swapRequestsTypeEnum().notNull(),
-    userShiftId: integer().references(() => usersShifts.id).notNull(),
+    userShiftId: integer().references(() => usersShifts.id),
+    shiftId: integer().references(() => shifts.id).notNull(),
     targetUserId: integer().references(() => users.id),
     status: swapRequestsStatusEnum().notNull().default("pending"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull().default(sql`now() + interval '1 hour'`),
@@ -127,6 +128,8 @@ export const swapRequests = pgTable("swap_requests", {
     index("swap_requests_requester_id_index").on(table.requesterId),
     index("swap_requests_target_user_id_index").on(table.targetUserId),
     index("swap_requests_user_shift_id_index").on(table.userShiftId),
+    index("swap_requests_shift_id_index").on(table.shiftId),
+    uniqueIndex("swap_requests_unique").on(table.requesterId, table.shiftId),
 ]);
 
 export const onDuty = pgTable("on_duty", {
@@ -266,9 +269,9 @@ export const relations = defineRelations({ users, usersLocations, usersSkills, u
             from: r.swapRequests.targetUserId,
             to: r.users.id
         }),
-        userShift: r.one.usersShifts({
-            from: r.swapRequests.userShiftId,
-            to: r.usersShifts.id
+        shift: r.one.shifts({
+            from: r.swapRequests.shiftId,
+            to: r.shifts.id
         })
     },
     usersShifts: {

@@ -38,6 +38,7 @@ import { checkDoubleBookingMiddleware } from "@/server/middlewares/checkDoubleBo
 import { createRequestSchema, updateRequestStatusSchema } from "@/server/validations/request";
 import RequestController from "@/server/controllers/RequestController";
 import { validateRequestWriteMiddleware } from "@/server/middlewares/validateRequestWrite";
+import { enforceLimitOnRequestMiddleware } from "@/server/middlewares/enforceLimitOnRequest";
 
 type Bindings = {
   db: typeof db
@@ -300,7 +301,7 @@ const appRoutes = app
     const shifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
     return c.json(shifts);
   })
-  .post("/my/requests", validate(createRequestSchema), checkAuthMiddleware, async (c) => {
+  .post("/my/requests", validate(createRequestSchema), checkAuthMiddleware, enforceLimitOnRequestMiddleware, async (c) => {
     const { type, userShiftId, targetUserId } = c.req.valid("json");
     const requesterId = c.get("userId");
     const request = await RequestController.createRequest(requesterId, type, userShiftId, targetUserId);
@@ -345,6 +346,10 @@ const appRoutes = app
       const errorObject = JSON.parse(JSON.stringify(error.cause));
       if (errorObject.code === "23505") {
         return c.json({ error: "Resource already exists" }, 409);
+      }
+
+      if (errorObject.cause.includes("unique constraint")) {
+        return c.json({ error: "Resource/Request already exists" }, 409);
       }
     }
 

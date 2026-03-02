@@ -122,9 +122,9 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
   };
 
   const formatRequestShift = (request: MyRequest) => {
-    const shift = request.userShift?.shift;
+    const shift = request.shift;
     if (!shift) {
-      return `Shift ${request.userShiftId}`;
+      return `Shift ${request.shiftId ?? request.id}`;
     }
     const tz = shift.location?.timezone ?? "UTC";
     return formatShiftTimeRange(
@@ -314,9 +314,9 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
           <TableBody>
             {myRequests.length === 0 ? (
               <TableRow>
-                <Td colSpan={6} className="py-4 text-center text-sm text-muted">
+                <td colSpan={6} className="px-4 py-3 text-center text-sm text-muted">
                   {loadingRequests ? "Loading requests…" : "No requests yet."}
-                </Td>
+                </td>
               </TableRow>
             ) : (
               myRequests.map((r) => (

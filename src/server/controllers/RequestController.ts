@@ -21,7 +21,7 @@ class RequestController {
             if (!shiftAssignment) {
                 throw new HTTPException(400, { message: "Target user is not assigned to this shift" });
             }
-            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, targetUserId }).returning();
+            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId }).returning();
             return request;
 
         } else {
@@ -29,7 +29,7 @@ class RequestController {
             if (!shiftAssignment) {
                 throw new HTTPException(400, { message: "Requester is not assigned to this shift" });
             }
-            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, targetUserId }).returning();
+            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId, status: "pending_manager_approval" }).returning();
             return request;
         }
     }
@@ -40,15 +40,7 @@ class RequestController {
 
         const requestsWithShift = await db.query.swapRequests.findMany({
             with: {
-                userShift: {
-                    with: {
-                        shift: {
-                            with: {
-                                location: true
-                            }
-                        }
-                    }
-                },
+                shift: true,
                 targetUser: true,
                 requester: true
             },
@@ -62,39 +54,18 @@ class RequestController {
     }
 
     static async getRequestsForManager(locationIds: number[]) {
-        const requests = await db
-            .select({ id: swapRequests.id })
-            .from(swapRequests)
-            .innerJoin(usersShifts, eq(swapRequests.userShiftId, usersShifts.id))
-            .innerJoin(shifts, eq(usersShifts.shiftId, shifts.id))
-            .where(
-                and(
-                    inArray(swapRequests.status, [
-                        "pending_manager_approval",
-                        "accepted",
-                        "rejected",
-                    ]),
-                    inArray(shifts.locationId, locationIds)
-                )
-            );
-
-        const requestIds = requests.map((r) => r.id);
 
         const requestsWithShift = await db.query.swapRequests.findMany({
             with: {
-                userShift: {
+                shift: {
                     with: {
-                        shift: {
-                            with: {
-                                location: true
-                            }
-                        }
+                        location: true
                     }
                 },
                 targetUser: true,
                 requester: true
             },
-            where: { id: { in: requestIds } },
+            where: { status: { in: ["pending_manager_approval", "accepted", "rejected"] }, shift: { locationId: { in: locationIds } } },
             orderBy: {
                 createdAt: "desc"
             }
@@ -115,12 +86,24 @@ class RequestController {
 
 
         if (oldRequest?.status === "pending_manager_approval" && request.type === 'swap' && request.status === 'accepted') {
-            await db.update(usersShifts).set({ userId: Number(request.requesterId) }).where(eq(usersShifts.id, request.userShiftId));
+            await db.update(usersShifts).set({ userId: Number(request.requesterId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
         } else if (oldRequest?.status === "pending_manager_approval" && request.type === 'drop' && request.status === 'accepted') {
-            await db.delete(usersShifts).where(eq(usersShifts.id, request.userShiftId));
+            await db.update(swapRequests).set({ userShiftId: null }).where(eq(swapRequests.shiftId, request.shiftId));
+            await db.delete(usersShifts).where(eq(usersShifts.id, Number(request.userShiftId)));
         }
 
         return request;
+    }
+
+    static async getPendingRequests(requesterId: number) {
+        return await db.query.swapRequests.findMany({
+            where: {
+                requesterId: requesterId,
+                status: {
+                    in: ["pending", "pending_manager_approval"]
+                }
+            }
+        });
     }
 }
 

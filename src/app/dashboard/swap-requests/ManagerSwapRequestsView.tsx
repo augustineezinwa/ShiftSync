@@ -101,22 +101,22 @@ export function ManagerSwapRequestsView() {
         <TableBody>
           {requests.length === 0 ? (
             <TableRow>
-              <Td colSpan={6} className="py-4 text-center text-sm text-muted">
+              <td colSpan={6} className="px-4 py-3 text-center text-sm text-muted">
                 {loading ? "Loading requests…" : "No requests pending approval."}
-              </Td>
+              </td>
             </TableRow>
           ) : (
             requests.map((r) => (
               <TableRow key={r.id}>
                 <Td className="capitalize">{r.type}</Td>
                 <Td>
-                  {r.userShift?.shift
+                  {r.shift
                     ? formatShiftTimeRange(
-                        r.userShift.shift.startTime as string | Date,
-                        r.userShift.shift.endTime as string | Date,
-                        r.userShift.shift.location?.timezone ?? "UTC"
+                        r.shift.startTime as string | Date,
+                        r.shift.endTime as string | Date,
+                        r.shift.location?.timezone ?? "UTC"
                       )
-                    : `Shift ${r.userShiftId}`}
+                    : `Shift ${r.shiftId ?? r.id}`}
                 </Td>
                 <Td>{r.requester?.name ?? r.requesterId}</Td>
                 <Td>{r.targetUser ? r.targetUser.name : "—"}</Td>

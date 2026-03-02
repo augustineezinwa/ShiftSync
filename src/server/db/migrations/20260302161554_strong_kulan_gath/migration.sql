@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "swap_requests_unique" ON "swap_requests" ("requesterId","shiftId");

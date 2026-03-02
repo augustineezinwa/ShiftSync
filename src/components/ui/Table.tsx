@@ -28,6 +28,18 @@ export function Th({ children, className }: { children: React.ReactNode; classNa
   );
 }
 
-export function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={clsx("px-4 py-3 text-gray-200", className)}>{children}</td>;
+export function Td({
+  children,
+  className,
+  colSpan,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  colSpan?: number;
+}) {
+  return (
+    <td className={clsx("px-4 py-3 text-gray-200", className)} colSpan={colSpan}>
+      {children}
+    </td>
+  );
 }

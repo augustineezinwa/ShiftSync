@@ -1,0 +1,1 @@
+ALTER TABLE "swap_requests" ALTER COLUMN "shiftId" SET NOT NULL;

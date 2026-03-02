@@ -41,7 +41,6 @@ export const checkAuthMiddleware = createMiddleware<{
     c.set('role', user.role);
     c.set('locations', user.locations);
     c.set('skills', user.skills);
-    console.log(user.id, '>>>>>>>>', user.id);
     await next();
 })
 
