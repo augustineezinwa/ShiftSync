@@ -14,6 +14,7 @@ async function seed() {
         { name: "Admin X", email: "admin@gmail.com", password: await hashPassword("password"), role: "admin" },
         { name: "Manager Y", email: "manager@gmail.com", password: await hashPassword("password"), role: "manager" },
         { name: "Staff Z", email: "staff@gmail.com", password: await hashPassword("password"), role: "staff" },
+        { name: "Staff A", email: "jet@gmail.com", password: await hashPassword("password"), role: "staff" },
     ]).onConflictDoNothing();
     await db.insert(skills).values([
         { name: "cook" },
