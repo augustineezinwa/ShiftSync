@@ -4,10 +4,10 @@ import { createMiddleware } from 'hono/factory'
 import { db } from '@/server/db';
 import jwt from 'jsonwebtoken';
 import { getCookie } from 'hono/cookie';
-import { locations } from '@/server/db/schema';
+import { locations, skills } from '@/server/db/schema';
 
 type Location = typeof locations.$inferSelect;
-
+type Skill = typeof skills.$inferSelect;
 
 
 export const checkAuthMiddleware = createMiddleware<{
@@ -15,7 +15,8 @@ export const checkAuthMiddleware = createMiddleware<{
         db: typeof db
         userId: number,
         role: string
-        locations: Location[]
+        locations: Location[],
+        skills: Skill[],
     }
 }>(async (c, next) => {
     const token = getCookie(c, "token");
@@ -30,6 +31,7 @@ export const checkAuthMiddleware = createMiddleware<{
         where: { id: decoded.userId },
         with: {
             locations: true,
+            skills: true,
         },
     });
     if (!user) {
@@ -38,6 +40,7 @@ export const checkAuthMiddleware = createMiddleware<{
     c.set('userId', user.id);
     c.set('role', user.role);
     c.set('locations', user.locations);
+    c.set('skills', user.skills);
     await next();
 })
 

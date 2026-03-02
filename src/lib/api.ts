@@ -364,3 +364,18 @@ export async function unassignUserFromShift(shiftId: number, userId: number) {
     if (!res.ok) throw new Error("Failed to unassign user from shift");
     return res.json();
 }
+
+/** Check if a user can be assigned to a shift. Returns ok: true or ok: false with error message (e.g. 400). */
+export async function getAssignUserStatus(
+    userId: number,
+    shiftId: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const res = await fetch(`/api/users/${userId}/shifts/${shiftId}/status`, { credentials: "include" });
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => ({}));
+    const error =
+        data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "Cannot assign this user to the shift";
+    return { ok: false, error };
+}

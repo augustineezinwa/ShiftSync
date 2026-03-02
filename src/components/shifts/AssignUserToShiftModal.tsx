@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { getAssignUserStatus } from "@/lib/api";
 import { X } from "lucide-react";
 
 export type UserOption = { id: number; name: string };
+
+type RedListItem = { user: UserOption; error: string };
 
 interface AssignUserToShiftModalProps {
   open: boolean;
@@ -34,27 +37,63 @@ export function AssignUserToShiftModal({
   isSubmitting = false,
 }: AssignUserToShiftModalProps) {
   const [waitingList, setWaitingList] = useState<UserOption[]>([]);
+  const [redList, setRedList] = useState<RedListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [unassigningId, setUnassigningId] = useState<number | null>(null);
+  const [statusLoadingId, setStatusLoadingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
       setWaitingList([]);
+      setRedList([]);
       setSelectedId("");
     }
   }, [open]);
 
   const assignedIds = new Set(assignedUsers.map((u) => u.id));
   const waitingIds = new Set(waitingList.map((u) => u.id));
-  const availableUsers = users.filter((u) => !assignedIds.has(u.id) && !waitingIds.has(u.id));
+  const redListIds = new Set(redList.map((r) => r.user.id));
+  const availableUsers = users.filter(
+    (u) => !assignedIds.has(u.id) && !waitingIds.has(u.id) && !redListIds.has(u.id)
+  );
 
   const addToWaitingList = (user: UserOption) => {
     setWaitingList((prev) => [...prev, user]);
     setSelectedId("");
   };
 
+  const addToRedList = (user: UserOption, error: string) => {
+    setRedList((prev) => {
+      if (prev.some((r) => r.user.id === user.id)) return prev;
+      return [...prev, { user, error }];
+    });
+    setSelectedId("");
+  };
+
+  const removeFromRedList = (userId: number) => {
+    setRedList((prev) => prev.filter((r) => r.user.id !== userId));
+  };
+
   const removeFromWaitingList = (id: number) => {
     setWaitingList((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const handleSelectUser = async (userId: number) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    setStatusLoadingId(userId);
+    try {
+      const result = await getAssignUserStatus(userId, shiftId);
+      if (result.ok) {
+        addToWaitingList(user);
+      } else {
+        addToRedList(user, result.error);
+      }
+    } catch {
+      addToRedList(user, "Could not check status");
+    } finally {
+      setStatusLoadingId(null);
+    }
   };
 
   const handleUnassign = async (userId: number) => {
@@ -78,6 +117,33 @@ export function AssignUserToShiftModal({
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
+        {redList.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-red-400">Cannot assign</p>
+            <div className="flex w-full flex-col gap-2">
+              {redList.map(({ user, error }) => (
+                <div
+                  key={user.id}
+                  className="flex w-full flex-col gap-1 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-red-300">{user.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromRedList(user.id)}
+                      className="rounded p-1 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+                      aria-label={`Dismiss ${user.name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="whitespace-pre-line text-xs text-red-400/90">{error}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {assignedUsers.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted">Assigned</p>
@@ -137,12 +203,10 @@ export function AssignUserToShiftModal({
             onChange={(e) => {
               const id = e.target.value;
               setSelectedId(id);
-              if (id) {
-                const user = users.find((u) => u.id === Number(id));
-                if (user) addToWaitingList(user);
-              }
+              if (id) handleSelectUser(Number(id));
             }}
-            className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            disabled={statusLoadingId !== null}
+            className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
             <option value="">Select a user…</option>
             {availableUsers.map((u) => (
@@ -151,6 +215,9 @@ export function AssignUserToShiftModal({
               </option>
             ))}
           </select>
+          {statusLoadingId !== null && (
+            <p className="mt-1 text-xs text-muted">Checking…</p>
+          )}
           {availableUsers.length === 0 && (
             <p className="mt-1 text-xs text-muted">All users are already assigned or selected.</p>
           )}

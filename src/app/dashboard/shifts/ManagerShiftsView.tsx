@@ -88,7 +88,7 @@ export function ManagerShiftsView() {
     try {
       const list = await getUsers();
       const users = Array.isArray(list) ? list : [];
-      setAssignableUsers(users.filter((u) => u.role !== "admin").map((u) => ({ id: u.id, name: u.name })));
+      setAssignableUsers(users.filter((u) => u.role === "staff").map((u) => ({ id: u.id, name: u.name })));
     } catch {
       setAssignableUsers([]);
     }

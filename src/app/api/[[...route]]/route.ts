@@ -29,6 +29,10 @@ import { ZodError } from "zod";
 import { validate } from "@/server/validations/utils";
 import { parseToLocalTimeMiddleware } from "@/server/middlewares/parseToLocalTime";
 import { validateTimeMiddleware } from "@/server/middlewares/validateTime";
+import { attachUserProbeMiddleware } from "@/server/middlewares/attachUserProbe";
+import { attachShiftMiddleware } from "@/server/middlewares/attachShift";
+import { assertSkillsMiddleware } from "@/server/middlewares/assertSkills";
+import { assertLocationMiddleware } from "@/server/middlewares/assertLocation";
 
 type Bindings = {
   db: typeof db
@@ -275,6 +279,9 @@ const appRoutes = app
     const weekEnd = c.req.query("weekEnd");
     const list = await ShiftController.getMyShifts(userId, weekStart ?? undefined, weekEnd ?? undefined);
     return c.json(list);
+  })
+  .get("/users/:userId/shifts/:shiftId/status", checkAuthMiddleware, allowOnlyManagerMiddleware, attachUserProbeMiddleware, attachShiftMiddleware, assertSkillsMiddleware, assertLocationMiddleware, async (c) => {
+    return c.json({ status: "ok" });
   })
   .onError(async (error, c) => {
     console.error(error);
