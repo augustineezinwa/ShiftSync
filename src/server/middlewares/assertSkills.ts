@@ -17,7 +17,7 @@ export const assertSkillsMiddleware = createMiddleware<{
     const probeUserSkills = c.get("probeUserSkills");
     const qualifiedUsers = await getQualifiedUsersForShift(Number(shiftId));
     if (!shiftSkillId || !probeUserSkills.some((skill) => skill.id === shiftSkillId)) {
-        return c.json({ error: `User doesn't have required skills: ${getFormattedUsersWithBulletPoints(qualifiedUsers)}` }, 400);
+        return c.json({ error: `User doesn't have required skills: ${getFormattedUsersWithBulletPoints(qualifiedUsers, "Qualified users:")}` }, 400);
     }
 
     await next();

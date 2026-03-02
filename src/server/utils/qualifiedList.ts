@@ -11,6 +11,47 @@ type User = typeof users.$inferSelect & {
 const MIN_HOURS_BETWEEN_SHIFTS = 10;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
+const WEEKDAY_TO_NUM: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/** Get day of week (0=Sun, 1=Mon, ..., 6=Sat) in the given timezone. */
+function getDayOfWeekInTz(date: Date, timezone: string): number {
+    const short = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(date);
+    return WEEKDAY_TO_NUM[short] ?? 0;
+}
+
+/** Get time string HH:mm:ss in the given timezone from a Date. */
+function getTimeStringInTz(date: Date, timezone: string): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: timezone,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    }).formatToParts(date);
+    const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
+    const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+    const second = parts.find((p) => p.type === "second")?.value ?? "00";
+    return `${hour}:${minute}:${second}`;
+}
+
+/** Same as assertAvailability: shift (in shift TZ) falls completely within an active availability for that day. */
+function userAvailabilityCoversShift(
+    availabilities: { dayOfWeek: number; startTime: unknown; endTime: unknown; isActive: boolean }[],
+    shiftStart: Date,
+    shiftEnd: Date,
+    timezone: string
+): boolean {
+    const tz = timezone ?? "UTC";
+    const shiftDayJs = getDayOfWeekInTz(shiftStart, tz); // 0=Sun, 1=Mon, ..., 6=Sat
+    const shiftDayDb = (shiftDayJs + 6) % 7; // app/DB: 0=Mon, 1=Tue, ..., 6=Sun
+    const shiftStartStr = getTimeStringInTz(shiftStart, tz);
+    const shiftEndStr = getTimeStringInTz(shiftEnd, tz);
+    const forDay = availabilities.filter((a) => a.dayOfWeek === shiftDayDb && a.isActive);
+    return forDay.some(
+        (a) => String(a.startTime) <= shiftStartStr && String(a.endTime) >= shiftEndStr
+    );
+}
+
 /** Same as checkDoubleBooking: no overlapping shifts for this user. */
 function userHasOverlappingShift(userId: number, shiftId: number, shiftStart: Date, shiftEnd: Date): Promise<boolean> {
     return ShiftController.getShiftsAssignedToUser(userId, shiftId).then((shifts) => {
@@ -51,6 +92,7 @@ export async function getQualifiedUsersForShift(shiftId: number) {
     const shiftLocation = shift.location;
     const shiftStartTime = shift.startTime instanceof Date ? shift.startTime : new Date(shift.startTime);
     const shiftEndTime = shift.endTime instanceof Date ? shift.endTime : new Date(shift.endTime);
+    const shiftTimezone = shiftLocation?.timezone ?? "UTC";
 
     const userLocations = await db.query.usersLocations.findMany({
         where: {
@@ -72,11 +114,7 @@ export async function getQualifiedUsersForShift(shiftId: number) {
         return (
             user?.skills.some((s) => s.id === shiftSkill?.id) &&
             user.locations.some((loc) => loc.id === shiftLocation?.id) &&
-            user.availabilities.some(
-                (a) =>
-                    new Date(a.startTime as unknown as string) <= shiftStartTime &&
-                    new Date(a.endTime as unknown as string) >= shiftEndTime
-            )
+            userAvailabilityCoversShift(user.availabilities, shiftStartTime, shiftEndTime, shiftTimezone)
         );
     });
 
@@ -99,5 +137,5 @@ export async function getQualifiedUsersForShift(shiftId: number) {
 export function getFormattedUsersWithBulletPoints(users: User[], label?: string): string {
     if (!users.length) return "";
     const bullets = users.map((u) => "• " + (u.name ?? "Unknown")).join("\n");
-    return label ? `${label}\n${bullets}` : bullets;
+    return label ? `\n${label}\n${bullets}` : bullets;
 }
