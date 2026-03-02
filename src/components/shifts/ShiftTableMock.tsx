@@ -10,6 +10,21 @@ export interface ShiftTableMockProps {
   showLocation?: boolean;
 }
 
+function isPremiumMockShift(dateStr: string, startTime: string, endTime: string): boolean {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+  const isFriday = weekday === "Fri";
+  const isSaturday = weekday === "Sat";
+  if (!isFriday && !isSaturday) return false;
+  const [endHourStr, endMinuteStr = "0"] = endTime.split(":");
+  const endHour = parseInt(endHourStr, 10);
+  const endMinute = parseInt(endMinuteStr, 10);
+  const minutesSinceMidnight = endHour * 60 + endMinute;
+  const eveningStartMinutes = 17 * 60; // 17:00
+  return minutesSinceMidnight >= eveningStartMinutes;
+}
+
 export function ShiftTableMock({ shifts, showLocation = true }: ShiftTableMockProps) {
   return (
     <Table>
@@ -33,6 +48,7 @@ export function ShiftTableMock({ shifts, showLocation = true }: ShiftTableMockPr
             .map((id) => getStaff(id)?.name)
             .filter(Boolean)
             .join(", ") || "—";
+          const premium = isPremiumMockShift(s.date, s.startTime, s.endTime);
           return (
             <TableRow key={s.id}>
               {showLocation && <Td>{loc?.name ?? s.locationId}</Td>}
@@ -47,7 +63,7 @@ export function ShiftTableMock({ shifts, showLocation = true }: ShiftTableMockPr
                 <Badge variant={s.status === "published" ? "success" : "muted"}>
                   {s.status}
                 </Badge>
-                {s.isPremium && (
+                {premium && (
                   <Badge variant="warning" className="ml-1">
                     Premium
                   </Badge>

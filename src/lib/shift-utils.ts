@@ -38,31 +38,46 @@ export function formatShiftTimeInTz(isoUtc: string | Date, timezone: string): st
 
 /**
  * Premium shift: Friday or Saturday evening in the location timezone.
- * "Evening" = shift start is at or after 17:00 (5 PM) in that timezone.
+ * "Evening" = any part of the shift occurs at or after 17:00 (5 PM) in that timezone.
+ * We use the shift's start date to determine the weekday, and the shift's end time to
+ * determine whether it reaches evening.
  */
-export function isPremiumShift(startTimeIsoUtc: string | Date, timezone: string): boolean {
-  const d = parseAsUtc(startTimeIsoUtc);
-  if (Number.isNaN(d.getTime())) return false;
-  const formatter = new Intl.DateTimeFormat("en-US", {
+export function isPremiumShift(
+  startTimeIsoUtc: string | Date,
+  endTimeIsoUtc: string | Date,
+  timezone: string
+): boolean {
+  const start = parseAsUtc(startTimeIsoUtc);
+  const end = parseAsUtc(endTimeIsoUtc);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+
+  // Weekday based on the shift start in the location timezone
+  const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     weekday: "short",
+  });
+  const weekday = weekdayFormatter.format(start);
+
+  const isFriday = weekday === "Fri";
+  const isSaturday = weekday === "Sat";
+  if (!isFriday && !isSaturday) return false;
+
+  // Time based on the shift end in the location timezone
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
     hour: "numeric",
     minute: "numeric",
     hour12: false,
   });
-  const parts = formatter.formatToParts(d);
-  let weekday: string | null = null;
+  const parts = timeFormatter.formatToParts(end);
   let hour = 0;
   let minute = 0;
   for (const p of parts) {
-    if (p.type === "weekday") weekday = p.value;
     if (p.type === "hour") hour = parseInt(p.value, 10);
     if (p.type === "minute") minute = parseInt(p.value, 10);
   }
-  const isFriday = weekday === "Fri";
-  const isSaturday = weekday === "Sat";
   const minutesSinceMidnight = hour * 60 + minute;
   const eveningStartMinutes = 17 * 60; // 17:00
-  const isEvening = minutesSinceMidnight >= eveningStartMinutes;
-  return (isFriday || isSaturday) && isEvening;
+  const reachesEvening = minutesSinceMidnight >= eveningStartMinutes;
+  return reachesEvening;
 }

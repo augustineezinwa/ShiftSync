@@ -45,7 +45,7 @@ export function ShiftTableApi({
       <TableBody>
         {shifts.map((s) => {
           const tz = s.location?.timezone ?? DEFAULT_TIMEZONE;
-          const premium = isPremiumShift(s.startTime, tz);
+          const premium = isPremiumShift(s.startTime, s.endTime, tz);
           const isDeleting = deletingId === s.id;
           return (
             <TableRow key={s.id}>
