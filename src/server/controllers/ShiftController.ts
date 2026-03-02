@@ -118,7 +118,13 @@ class ShiftController {
         const assignedRows = await db
             .select({ shiftId: usersShifts.shiftId })
             .from(usersShifts)
-            .where(eq(usersShifts.userId, userId));
+            .innerJoin(shifts, eq(usersShifts.shiftId, shifts.id))
+            .where(
+                and(
+                    eq(usersShifts.userId, userId),
+                    eq(shifts.status, "published")
+                )
+            );
         const assignedIds = assignedRows.map((r) => r.shiftId);
         if (assignedIds.length === 0) return [];
         const allMatching = await ShiftController.getShifts(weekStart, weekEnd);
