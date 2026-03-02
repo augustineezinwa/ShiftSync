@@ -53,6 +53,7 @@ export const assertAvailabilityMiddleware = createMiddleware<{
             const shiftStartStr = getTimeStringInTz(shiftStartTime, tz);
             const shiftEndStr = getTimeStringInTz(shiftEndTime, tz);
             const forDay = probeUserAvailabilities.filter((a) => a.dayOfWeek === shiftDayDb && a.isActive);
+            // User is available only if the shift falls completely within their availability window
             return forDay.some(
                 (a) =>
                     String(a.startTime) <= shiftStartStr &&
