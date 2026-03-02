@@ -41,7 +41,11 @@ class RequestController {
 
         const requestsWithShift = await db.query.swapRequests.findMany({
             with: {
-                shift: true,
+                shift: {
+                    with: {
+                        location: true
+                    }
+                },
                 targetUser: true,
                 requester: true
             },
