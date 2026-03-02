@@ -3,7 +3,6 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from "@/server/db";
 import { checkAuthMiddleware } from "@/server/middlewares/checkAuth";
 import { createUserSchema, loginUserSchema } from "@/server/validations/user";
-import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { deleteCookie, setCookie } from 'hono/cookie';
@@ -36,6 +35,9 @@ import { assertLocationMiddleware } from "@/server/middlewares/assertLocation";
 import { assertAvailabilityMiddleware } from "@/server/middlewares/assertAvailability";
 import { assertMinHoursBetweenShiftsMiddleware } from "@/server/middlewares/assertMinHoursBetweenShifts";
 import { checkDoubleBookingMiddleware } from "@/server/middlewares/checkDoubleBooking";
+import { createRequestSchema, updateRequestStatusSchema } from "@/server/validations/request";
+import RequestController from "@/server/controllers/RequestController";
+import { validateRequestWriteMiddleware } from "@/server/middlewares/validateRequestWrite";
 
 type Bindings = {
   db: typeof db
@@ -285,6 +287,41 @@ const appRoutes = app
   })
   .get("/users/:userId/shifts/:shiftId/status", checkAuthMiddleware, allowOnlyManagerMiddleware, attachUserProbeMiddleware, attachShiftMiddleware, assertSkillsMiddleware, assertLocationMiddleware, assertAvailabilityMiddleware, assertMinHoursBetweenShiftsMiddleware, checkDoubleBookingMiddleware, async (c) => {
     return c.json({ status: "ok" });
+  })
+  .get("/shifts/:shiftId/qualified-users", checkAuthMiddleware, async (c) => {
+    const id = Number(c.req.param("shiftId"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const users = await ShiftController.getQualifiedUsersForShift(id);
+    return c.json(users);
+  })
+  .get("/me/shifts/qualified", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const locationIds = c.get("locations").map((l) => l.id);
+    const shifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
+    return c.json(shifts);
+  })
+  .post("/my/requests", validate(createRequestSchema), checkAuthMiddleware, async (c) => {
+    const { type, userShiftId, targetUserId } = c.req.valid("json");
+    const requesterId = c.get("userId");
+    const request = await RequestController.createRequest(requesterId, type, userShiftId, targetUserId);
+    return c.json(request);
+  })
+  .get("/my/requests", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const requests = await RequestController.getRequests(userId);
+    return c.json(requests);
+  })
+  .get("/my/manager/requests", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const locationIds = c.get("locations").map((l) => l.id);
+    const requests = await RequestController.getRequestsForManager(locationIds);
+    return c.json(requests);
+  })
+  .put("/my/requests/:id", validate(updateRequestStatusSchema), checkAuthMiddleware, validateRequestWriteMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const { status } = c.req.valid("json");
+    const request = await RequestController.updateRequestStatus(id, status);
+    return c.json(request);
   })
   .onError(async (error, c) => {
     console.error(error);

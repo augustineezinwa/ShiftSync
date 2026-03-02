@@ -21,7 +21,7 @@ class UserController {
     if (!user) return null;
     const isPasswordValid = await this.isPasswordValid(password, user.password);
     if (!isPasswordValid) return null;
-    const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: "4h" });
     return { user, token };
   }
 

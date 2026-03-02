@@ -1,15 +1,47 @@
 import { db } from "@/server/db";
-import { shifts, usersShifts } from "@/server/db/schema";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { shifts, swapRequests, usersShifts } from "@/server/db/schema";
+import { and, asc, eq, exists, inArray } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { getQualifiedUsersForShift } from "../utils/qualifiedList";
 
 class ShiftController {
     static async createShift(locationId: number, skillId: number, startTime: Date, endTime: Date, headcount: number) {
         const [shift] = await db.insert(shifts).values({ locationId, skillId, startTime, endTime, headcount, status: "draft" }).returning();
         return shift;
     }
-    static async updateShift(id: number, locationId: number, skillId: number, startTime: Date, endTime: Date, headcount: number) {
-        const [shift] = await db.update(shifts).set({ locationId, skillId, startTime, endTime, headcount }).where(eq(shifts.id, id)).returning();
+    static async updateShift(
+        id: number,
+        locationId: number,
+        skillId: number,
+        startTime: Date,
+        endTime: Date,
+        headcount: number
+    ) {
+        const [shift] = await db
+            .update(shifts)
+            .set({ locationId, skillId, startTime, endTime, headcount })
+            .where(eq(shifts.id, id))
+            .returning();
+
+        await db
+            .update(swapRequests)
+            .set({ status: "cancelled" })
+            .where(
+                and(
+                    inArray(
+                        swapRequests.userShiftId,
+                        db
+                            .select({ id: usersShifts.id })
+                            .from(usersShifts)
+                            .where(eq(usersShifts.shiftId, id))
+                    ),
+                    inArray(swapRequests.status, [
+                        "pending_manager_approval",
+                        "pending",
+                    ])
+                )
+            );
+
         return shift;
     }
 
@@ -33,6 +65,7 @@ class ShiftController {
                 location: true,
                 skill: true,
                 users: true,
+                usersShifts: true,
             },
             where: { id },
         });
@@ -48,6 +81,7 @@ class ShiftController {
                 location: true,
                 skill: true,
                 users: true,
+                usersShifts: true,
             },
         });
         if (!weekStart || !weekEnd) return all;
@@ -96,11 +130,47 @@ class ShiftController {
             toInsert.map((userId) => ({ shiftId, userId }))
         );
         const shift = await ShiftController.getShift(shiftId);
+        await db
+            .update(swapRequests)
+            .set({ status: "cancelled" })
+            .where(
+                and(
+                    inArray(
+                        swapRequests.userShiftId,
+                        db
+                            .select({ id: usersShifts.id })
+                            .from(usersShifts)
+                            .where(eq(usersShifts.shiftId, shiftId))
+                    ),
+                    inArray(swapRequests.status, [
+                        "pending_manager_approval",
+                        "pending",
+                    ])
+                )
+            );
         return shift;
     }
 
     static async unassignUserFromShift(shiftId: number, userId: number) {
         await db.delete(usersShifts).where(and(eq(usersShifts.shiftId, shiftId), eq(usersShifts.userId, userId)));
+        await db
+            .update(swapRequests)
+            .set({ status: "cancelled" })
+            .where(
+                and(
+                    inArray(
+                        swapRequests.userShiftId,
+                        db
+                            .select({ id: usersShifts.id })
+                            .from(usersShifts)
+                            .where(eq(usersShifts.shiftId, shiftId))
+                    ),
+                    inArray(swapRequests.status, [
+                        "pending_manager_approval",
+                        "pending",
+                    ])
+                )
+            );
         return ShiftController.getShift(shiftId);
     }
 
@@ -146,6 +216,35 @@ class ShiftController {
             .from(shifts)
             .where(inArray(shifts.id, assignedIds));
         return rows;
+    }
+
+    static async getQualifiedUsersForShift(shiftId: number) {
+        return await getQualifiedUsersForShift(shiftId);
+    }
+
+    static async getQualifiedShiftsForUser(userId: number, locationIds: number[]) {
+        const qualifiedShifts = [];
+        const shiftsInUserLocations = await db.query.shifts.findMany({
+            with: {
+                location: true,
+                skill: true,
+                users: true,
+            },
+            where: {
+                status: "published",
+                locationId: {
+                    in: locationIds
+                }
+            }
+        });
+        for (const shift of shiftsInUserLocations) {
+            const qualifiedUsers = await getQualifiedUsersForShift(shift.id);
+            if (qualifiedUsers.some((user) => user.id === userId)) {
+                qualifiedShifts.push(shift);
+            }
+        }
+
+        return qualifiedShifts.filter((shift) => shift.users.length > 0 && !shift.users.some((user) => user.id === userId));
     }
 }
 

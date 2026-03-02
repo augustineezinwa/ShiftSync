@@ -197,7 +197,7 @@ export const config = pgTable("config", {
  * relations
  * 
 */
-export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability, config, shifts, usersShifts }, (r) => ({
+export const relations = defineRelations({ users, usersLocations, usersSkills, usersSettings, locations, skills, usersAvailability, config, shifts, usersShifts, swapRequests }, (r) => ({
     users: {
         skills: r.many.skills({
             from: r.users.id.through(r.usersSkills.userId),
@@ -251,7 +251,35 @@ export const relations = defineRelations({ users, usersLocations, usersSkills, u
         users: r.many.users({
             from: r.shifts.id.through(r.usersShifts.shiftId),
             to: r.users.id.through(r.usersShifts.userId),
+        }),
+        usersShifts: r.many.usersShifts({
+            from: r.shifts.id,
+            to: r.usersShifts.shiftId,
         })
+    },
+    swapRequests: {
+        requester: r.one.users({
+            from: r.swapRequests.requesterId,
+            to: r.users.id
+        }),
+        targetUser: r.one.users({
+            from: r.swapRequests.targetUserId,
+            to: r.users.id
+        }),
+        userShift: r.one.usersShifts({
+            from: r.swapRequests.userShiftId,
+            to: r.usersShifts.id
+        })
+    },
+    usersShifts: {
+        shift: r.one.shifts({
+            from: r.usersShifts.shiftId,
+            to: r.shifts.id,
+        }),
+        user: r.one.users({
+            from: r.usersShifts.userId,
+            to: r.users.id,
+        }),
     }
 })
 );

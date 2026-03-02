@@ -246,6 +246,13 @@ export async function getMyShifts(params?: { weekStart?: string; weekEnd?: strin
     return res.json();
 }
 
+/** Shifts the current user is allowed to swap (staff). */
+export async function getMyQualifiedShifts() {
+    const res = await fetch("/api/me/shifts/qualified", { credentials: "include" });
+    if (!res.ok) throw new Error("Failed to fetch my qualified shifts");
+    return res.json();
+}
+
 export async function getShift(id: number) {
     const res = await api.shifts[":id"].$get({ param: { id: String(id) } });
     if (!res.ok) throw new Error("Failed to fetch shift");
@@ -378,4 +385,79 @@ export async function getAssignUserStatus(
             ? (data as { error: string }).error
             : "Cannot assign this user to the shift";
     return { ok: false, error };
+}
+
+/** Qualified users for a shift (already filtered by skills, location, availability, etc.). */
+export async function getQualifiedUsersForShift(shiftId: number) {
+    const res = await fetch(`/api/shifts/${shiftId}/qualified-users`, {
+        credentials: "include",
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to fetch qualified users";
+        throw new Error(msg);
+    }
+    return res.json();
+}
+
+/** Create swap/drop request for the current user. */
+export async function createMyRequest(payload: { type: "swap" | "drop"; userShiftId: number; targetUserId?: number; requesterId: number }) {
+    const res = await fetch("/api/my/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to create request";
+        throw new Error(msg);
+    }
+    return data;
+}
+
+/** Swap/drop requests related to the current user (as requester or receiver). */
+export async function getMyRequests() {
+    const res = await api.my.requests.$get();
+    if (!res.ok) throw new Error("Failed to fetch my requests");
+    return res.json();
+}
+
+/** Requests for manager approval (same response shape as getMyRequests). */
+export async function getManagerRequests() {
+    const res = await api.my.manager.requests.$get();
+    if (!res.ok) throw new Error("Failed to fetch manager requests");
+    return res.json();
+}
+
+export type MyRequest = Awaited<ReturnType<typeof getMyRequests>>[number];
+
+export type RequestStatus =
+    | "pending"
+    | "pending_manager_approval"
+    | "accepted"
+    | "rejected"
+    | "cancelled";
+
+/** Update status of a swap/drop request. */
+export async function updateMyRequestStatus(id: number, status: RequestStatus) {
+    const res = await api.my.requests[":id"].$put({
+        param: { id: String(id) },
+        json: { status },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to update request";
+        throw new Error(msg);
+    }
+    return data;
 }
