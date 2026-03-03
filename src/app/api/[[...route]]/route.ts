@@ -278,7 +278,7 @@ const appRoutes = app
       return c.json(shift);
     }
   )
-  .get("/shifts", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+  .get("/shifts", checkAuthMiddleware, allowAdminOrManagerMiddleware, async (c) => {
     const weekStart = c.req.query("weekStart");
     const weekEnd = c.req.query("weekEnd");
     const list = await ShiftController.getShifts(weekStart ?? undefined, weekEnd ?? undefined);

@@ -6,8 +6,9 @@ import { Table, TableHead, TableBody, TableRow, Th, Td } from "@/components/ui/T
 import { SectionFilters } from "@/components/dashboard/SectionFilters";
 import { StaffDashboardView } from "@/components/dashboard/StaffDashboardView";
 import { useAuth } from "@/providers/AuthProvider";
-import { SHIFTS, type Role } from "@/lib/mock-data";
-import { getLocations, getLiveDuties } from "@/lib/api";
+import { type Role } from "@/lib/mock-data";
+import { getLocations, getLiveDuties, getShifts, type ApiShift } from "@/lib/api";
+import { getUpcomingWeekRanges, CURRENT_WEEK_INDEX } from "@/lib/week-ranges";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -15,6 +16,9 @@ export default function DashboardPage() {
   const isStaff = role === "staff";
   const isManager = role === "manager";
   const isAdmin = role === "admin";
+
+  const weekRanges = getUpcomingWeekRanges();
+  const currentWeek = weekRanges[CURRENT_WEEK_INDEX];
 
   const { data: locationsData } = useQuery({
     queryKey: ["locations"],
@@ -29,15 +33,26 @@ export default function DashboardPage() {
     refetchInterval: 20_000,
   });
 
+  const { data: shiftsData = [] } = useQuery<ApiShift[]>({
+    queryKey: ["shifts", "dashboard", currentWeek],
+    queryFn: () =>
+      getShifts(
+        currentWeek
+          ? { weekStart: currentWeek.start, weekEnd: currentWeek.end }
+          : undefined
+      ),
+    enabled: isAdmin && !!currentWeek,
+  });
+
   if (isStaff) {
     return <StaffDashboardView />;
   }
 
-  const locationsCount = isAdmin
-    ? Array.isArray(locationsData)
-      ? locationsData.length
-      : "—"
-    : 0;
+  const locationsCount =
+    isAdmin && Array.isArray(locationsData) ? locationsData.length : "—";
+
+  const shiftsCount =
+    isAdmin && Array.isArray(shiftsData) ? shiftsData.length : "—";
 
   return (
     <>
@@ -53,7 +68,7 @@ export default function DashboardPage() {
             </Card>
             <Card>
               <CardHeader className="text-muted">Total shifts (this week)</CardHeader>
-              <p className="text-2xl font-semibold text-white">{SHIFTS.length}</p>
+              <p className="text-2xl font-semibold text-white">{shiftsCount}</p>
             </Card>
           </>
         )}
