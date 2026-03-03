@@ -18,7 +18,7 @@ export default function DashboardPage() {
     return <StaffDashboardView />;
   }
 
-  const locationIds: string[] | undefined = undefined;
+  const locationIds: string[] = user?.locations?.map((l: { id: number }) => String(l.id)) ?? [];
   const onDutyNow = isAdmin ? getOnDutyNow(locationIds) : [];
 
   return (
