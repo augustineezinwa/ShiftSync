@@ -6,8 +6,8 @@ import { Table, TableHead, TableBody, TableRow, Th, Td } from "@/components/ui/T
 import { SectionFilters } from "@/components/dashboard/SectionFilters";
 import { StaffDashboardView } from "@/components/dashboard/StaffDashboardView";
 import { useAuth } from "@/providers/AuthProvider";
-import { SHIFTS, getOnDutyNow, type Role } from "@/lib/mock-data";
-import { getLocations } from "@/lib/api";
+import { SHIFTS, type Role } from "@/lib/mock-data";
+import { getLocations, getLiveDuties } from "@/lib/api";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -22,12 +22,16 @@ export default function DashboardPage() {
     enabled: isAdmin,
   });
 
+  const { data: liveDutiesData = [] } = useQuery({
+    queryKey: ["duties", "live"],
+    queryFn: getLiveDuties,
+    enabled: isAdmin,
+    refetchInterval: 20_000,
+  });
+
   if (isStaff) {
     return <StaffDashboardView />;
   }
-
-  const locationIds: string[] = user?.locations?.map((l: { id: number }) => String(l.id)) ?? [];
-  const onDutyNow = isAdmin ? getOnDutyNow(locationIds) : [];
 
   const locationsCount = isAdmin
     ? Array.isArray(locationsData)
@@ -83,7 +87,7 @@ export default function DashboardPage() {
       {isAdmin && (
         <div className="mt-6">
           <SectionFilters />
-          {onDutyNow.length > 0 && (
+          {Array.isArray(liveDutiesData) && liveDutiesData.length > 0 && (
             <Card>
               <CardHeader>Live on-duty</CardHeader>
               <p className="mb-3 text-sm text-muted">Staff currently clocked in across all locations.</p>
@@ -98,12 +102,12 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {onDutyNow.map((entry) => (
+                  {liveDutiesData.map((entry: any) => (
                     <TableRow key={`${entry.staffId}-${entry.locationId}-${entry.shiftStart}`}>
                       <Td className="font-medium text-gray-100">{entry.staffName}</Td>
                       <Td>{entry.locationName}</Td>
-                      <Td>{entry.shiftStart}</Td>
-                      <Td>{entry.shiftEnd}</Td>
+                      <Td>{new Date(entry.shiftStart).toLocaleString()}</Td>
+                      <Td>{new Date(entry.shiftEnd).toLocaleString()}</Td>
                       <Td>
                         <span className="text-success">Clocked In ✅</span>
                       </Td>

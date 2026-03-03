@@ -326,6 +326,13 @@ export async function getDuties() {
     return res.json();
 }
 
+/** Live on-duty entries for admin dashboard (all locations the admin can see). */
+export async function getLiveDuties() {
+    const res = await fetch("/api/duties/live", { credentials: "include" });
+    if (!res.ok) throw new Error("Failed to fetch live duties");
+    return res.json();
+}
+
 /** Clock in for a shift. Creates an on_duty record. */
 export async function createDuty(shiftId: number) {
     const res = await fetch("/api/duties", {

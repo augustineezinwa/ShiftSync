@@ -170,6 +170,11 @@ const appRoutes = app
     const duties = await DutyController.getMyDuties(userId);
     return c.json(duties);
   })
+  .get("/duties/live", checkAuthMiddleware, allowOnlyAdminMiddleware, async (c) => {
+    const locationIds = c.get("locations").map((l) => l.id);
+    const duties = await DutyController.getLiveDutiesByLocations(locationIds);
+    return c.json(duties);
+  })
   .post("/duties", validate(createDutySchema), checkAuthMiddleware, async (c) => {
     const { shiftId } = c.req.valid("json");
     const userId = c.get("userId");

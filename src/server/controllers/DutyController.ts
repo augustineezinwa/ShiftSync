@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, lte, gte } from "drizzle-orm";
 import { db } from "../db";
-import { onDuty, usersShifts, shifts } from "../db/schema";
+import { onDuty, usersShifts, shifts, users, locations } from "../db/schema";
 
 class DutyController {
     /** Create a clock-in record for the user's assignment to the given shift. */
@@ -42,6 +42,36 @@ class DutyController {
             .from(onDuty)
             .innerJoin(usersShifts, eq(onDuty.userShiftId, usersShifts.id))
             .where(eq(onDuty.userId, userId));
+        return rows;
+    }
+
+    /** All active duties across the given locations (for admin live on-duty view). */
+    static async getLiveDutiesByLocations(locationIds: number[]) {
+        const now = new Date();
+        const conditions = [
+            lte(onDuty.clockInAt, now),
+            gte(onDuty.clockOutAt, now),
+        ];
+        if (locationIds.length > 0) {
+            conditions.push(inArray(shifts.locationId, locationIds));
+        }
+
+        const rows = await db
+            .select({
+                staffId: users.id,
+                staffName: users.name,
+                locationId: locations.id,
+                locationName: locations.name,
+                shiftStart: shifts.startTime,
+                shiftEnd: shifts.endTime,
+            })
+            .from(onDuty)
+            .innerJoin(usersShifts, eq(onDuty.userShiftId, usersShifts.id))
+            .innerJoin(shifts, eq(usersShifts.shiftId, shifts.id))
+            .innerJoin(users, eq(onDuty.userId, users.id))
+            .innerJoin(locations, eq(shifts.locationId, locations.id))
+            .where(and(...conditions));
+
         return rows;
     }
 }
