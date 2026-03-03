@@ -356,12 +356,14 @@ const appRoutes = app
   })
   .get("/me/shifts/external/users/:userId/qualified", checkAuthMiddleware, async (c) => {
     const userId = Number(c.req.param("userId"));
+    const loggedInUserId = c.get("userId");
     if (Number.isNaN(userId)) return c.json({ error: "Invalid id" }, 400);
     const user = await UserController.getUser(userId);
     if (!user) return c.json({ error: "User not found" }, 404);
     const locationIds = user.locations.map((l) => l.id);
     const shifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
-    return c.json({ shifts });
+    const userShifts = shifts.filter((s) => s.users.some((u) => u.id === loggedInUserId));
+    return c.json({ shifts: userShifts });
   })
   .post("/my/requests", validate(createRequestSchema), checkAuthMiddleware, enforceLimitOnRequestMiddleware, async (c) => {
     const { type, userShiftId, targetUserId, receiverShiftId } = c.req.valid("json");

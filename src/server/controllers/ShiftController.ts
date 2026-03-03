@@ -160,29 +160,8 @@ class ShiftController {
 
     static async unassignUserFromShift(shiftId: number, userId: number) {
         await db.delete(usersShifts).where(and(eq(usersShifts.shiftId, shiftId), eq(usersShifts.userId, userId)));
-        const updatedRequests = await db
-            .update(swapRequests)
-            .set({ status: "cancelled" })
-            .where(
-                and(
-                    inArray(
-                        swapRequests.userShiftId,
-                        db
-                            .select({ id: usersShifts.id })
-                            .from(usersShifts)
-                            .where(eq(usersShifts.shiftId, shiftId))
-                    ),
-                    inArray(swapRequests.status, [
-                        "pending_manager_approval",
-                        "pending",
-                    ])
-                )
-            ).returning();
-
-        const targetUserIds = updatedRequests.map(request => request.targetUserId).filter(Boolean);
-        const requesterIds = updatedRequests.map(request => request.requesterId).filter(Boolean);
         event.emit(SHIFT_CHANGED, { shiftId, userIds: [userId] });
-        event.emit(SWAP_REQUEST_UPDATED, { targetUserIds, requesterIds });
+
         return ShiftController.getShift(shiftId);
     }
 

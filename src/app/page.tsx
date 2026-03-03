@@ -16,9 +16,7 @@ export default function LoginPage() {
     mutationFn: () => login(email, password),
     onSuccess: (data: Awaited<ReturnType<typeof login>>) => {
       const { user } = data;
-      router.push(
-        `/dashboard?role=${user.role}&userId=${user.id}`
-      );
+      router.push("/dashboard");
     },
   });
 

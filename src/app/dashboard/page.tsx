@@ -68,7 +68,7 @@ export default function DashboardPage() {
 
       {isAdmin && (
         <div className="mt-6">
-          <SectionFilters role={role} userId={user ? String(user.id) : null} />
+          <SectionFilters />
           {onDutyNow.length > 0 && (
             <Card>
               <CardHeader>Live on-duty</CardHeader>

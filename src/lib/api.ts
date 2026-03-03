@@ -348,6 +348,26 @@ export async function getMyQualifiedShifts() {
     return res.json();
 }
 
+/** Shifts for an external user that are swappable with the logged-in user (staff swap form). */
+export async function getExternalQualifiedShifts(userId: number) {
+    const res = await fetch(`/api/me/shifts/external/users/${userId}/qualified`, {
+        credentials: "include",
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+            data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string"
+                ? (data as { error: string }).error
+                : "Failed to fetch external qualified shifts";
+        throw new Error(msg);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (data && typeof data === "object" && "shifts" in data && Array.isArray((data as { shifts: unknown }).shifts)) {
+        return (data as { shifts: ApiShift[] }).shifts;
+    }
+    return [];
+}
+
 export async function getShift(id: number) {
     const res = await api.shifts[":id"].$get({ param: { id: String(id) } });
     if (!res.ok) throw new Error("Failed to fetch shift");
@@ -510,7 +530,13 @@ export async function getQualifiedUsersForShift(shiftId: number) {
 }
 
 /** Create swap/drop request for the current user. */
-export async function createMyRequest(payload: { type: "swap" | "drop"; userShiftId: number; targetUserId?: number; requesterId: number }) {
+export async function createMyRequest(payload: {
+    type: "swap" | "drop";
+    userShiftId: number;
+    targetUserId?: number;
+    requesterId: number;
+    receiverShiftId?: number;
+}) {
     const res = await fetch("/api/my/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

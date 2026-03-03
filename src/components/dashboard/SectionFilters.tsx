@@ -3,8 +3,8 @@
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useRef, useEffect, useState } from "react";
 import { MapPin, Calendar, ChevronDown } from "lucide-react";
-import { LOCATIONS, getStaff } from "@/lib/mock-data";
-import type { Role } from "@/lib/mock-data";
+import { LOCATIONS } from "@/lib/mock-data";
+import { useAuth } from "@/providers/AuthProvider";
 
 function getDefaultDateRange() {
   const now = new Date();
@@ -18,12 +18,9 @@ function getDefaultDateRange() {
   };
 }
 
-interface SectionFiltersProps {
-  role?: Role;
-  userId?: string | null;
-}
-
-export function SectionFilters({ role, userId }: SectionFiltersProps) {
+export function SectionFilters() {
+  const { user } = useAuth();
+  const role = user?.role as "admin" | "manager" | "staff" | undefined;
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -35,15 +32,10 @@ export function SectionFilters({ role, userId }: SectionFiltersProps) {
   const dateFrom = searchParams.get("dateFrom") ?? getDefaultDateRange().dateFrom;
   const dateTo = searchParams.get("dateTo") ?? getDefaultDateRange().dateTo;
 
-  const availableLocations =
-    role === "manager" || role === "staff"
-      ? (() => {
-        const staff = userId ? getStaff(userId) : null;
-        return staff?.locationIds?.length
-          ? LOCATIONS.filter((l) => staff.locationIds.includes(l.id))
-          : LOCATIONS;
-      })()
-      : LOCATIONS;
+  const availableLocations: { id: string; name: string }[] =
+    role === "admin"
+      ? LOCATIONS
+      : (user?.locations?.map((l: { id: number; name: string }) => ({ id: String(l.id), name: l.name })) ?? []);
 
   const buildUrl = useCallback(
     (updates: { locations?: string[]; dateFrom?: string; dateTo?: string }) => {

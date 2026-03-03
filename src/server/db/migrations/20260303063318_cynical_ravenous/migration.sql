@@ -1,0 +1,2 @@
+ALTER TABLE "swap_requests" ADD COLUMN "receiverShiftAssignmentId" integer;--> statement-breakpoint
+ALTER TABLE "swap_requests" ADD CONSTRAINT "swap_requests_receiverShiftAssignmentId_users_shifts_id_fkey" FOREIGN KEY ("receiverShiftAssignmentId") REFERENCES "users_shifts"("id");

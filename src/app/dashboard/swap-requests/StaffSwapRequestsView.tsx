@@ -12,6 +12,7 @@ import {
   getMyShifts,
   getMyQualifiedShifts,
   getQualifiedUsersForShift,
+  getExternalQualifiedShifts,
   type ApiShift,
   type AuthUser,
   type MyRequest,
@@ -53,8 +54,11 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
   const [requestType, setRequestType] = useState<"swap" | "drop">("swap");
   const [qualifiedUsers, setQualifiedUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedTargetUserId, setSelectedTargetUserId] = useState<string>("");
+  const [externalShifts, setExternalShifts] = useState<ApiShift[]>([]);
+  const [selectedExternalShiftId, setSelectedExternalShiftId] = useState<string>("");
   const [loadingShifts, setLoadingShifts] = useState(false);
   const [loadingQualified, setLoadingQualified] = useState(false);
+  const [loadingExternalShifts, setLoadingExternalShifts] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [updatingRequestId, setUpdatingRequestId] = useState<number | null>(null);
@@ -112,6 +116,27 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
       .finally(() => setLoadingQualified(false));
   }, [selectedShiftId, user.id]);
 
+  useEffect(() => {
+    if (requestType !== "swap" || !selectedTargetUserId) {
+      setExternalShifts([]);
+      setSelectedExternalShiftId("");
+      return;
+    }
+    setLoadingExternalShifts(true);
+    setError(null);
+    getExternalQualifiedShifts(Number(selectedTargetUserId))
+      .then((shifts) => {
+        setExternalShifts(Array.isArray(shifts) ? shifts : []);
+        setSelectedExternalShiftId("");
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Failed to load external shifts");
+        setExternalShifts([]);
+        setSelectedExternalShiftId("");
+      })
+      .finally(() => setLoadingExternalShifts(false));
+  }, [requestType, selectedTargetUserId]);
+
   const formatShiftLabel = (shift: ApiShift) => {
     const tz = shift.location?.timezone ?? "UTC";
     return formatShiftTimeRange(
@@ -152,9 +177,15 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
       setError("Please select a shift.");
       return;
     }
-    if (requestType === "swap" && !selectedTargetUserId) {
-      setError("Please select a user to swap with.");
-      return;
+    if (requestType === "swap") {
+      if (!selectedTargetUserId) {
+        setError("Please select a user to swap with.");
+        return;
+      }
+      if (!selectedExternalShiftId) {
+        setError("Please select a shift to swap with.");
+        return;
+      }
     }
     setSubmitting(true);
     setError(null);
@@ -165,10 +196,12 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
         userShiftId: Number(selectedShiftId),
         requesterId: user.id,
         targetUserId: requestType === "swap" ? Number(selectedTargetUserId) : undefined,
+        receiverShiftId: requestType === "swap" ? Number(selectedExternalShiftId) : undefined,
       });
       setSuccess("Request submitted.");
       setSelectedTargetUserId("");
       setSelectedShiftId("");
+      setSelectedExternalShiftId("");
       setFormOpen(false);
       // Refresh list so the new request appears
       setLoadingRequests(true);
@@ -268,7 +301,10 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
             <label className="mb-1 block text-xs text-muted">User</label>
             <select
               value={selectedTargetUserId}
-              onChange={(e) => setSelectedTargetUserId(e.target.value)}
+              onChange={(e) => {
+                setSelectedTargetUserId(e.target.value);
+                setSelectedExternalShiftId("");
+              }}
               disabled={requestType === "drop" || loadingQualified || qualifiedUsers.length === 0}
               className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
             >
@@ -282,6 +318,34 @@ export function StaffSwapRequestsView({ user }: { user: AuthUser }) {
               ))}
             </select>
           </div>
+          {requestType === "swap" && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Swap with</label>
+              <select
+                value={selectedExternalShiftId}
+                onChange={(e) => setSelectedExternalShiftId(e.target.value)}
+                disabled={
+                  !selectedTargetUserId ||
+                  loadingExternalShifts ||
+                  externalShifts.length === 0
+                }
+                className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+              >
+                <option value="">
+                  {!selectedTargetUserId
+                    ? "Select a user first…"
+                    : externalShifts.length === 0
+                      ? "No compatible shifts"
+                      : "Select a shift…"}
+                </option>
+                {externalShifts.map((shift) => (
+                  <option key={shift.id} value={shift.id}>
+                    {formatShiftLabel(shift)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"

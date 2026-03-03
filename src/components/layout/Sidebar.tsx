@@ -44,10 +44,12 @@ const navItems: NavItem[] = [
 
 interface SidebarProps {
   role: Role;
-  query?: string;
+  open?: boolean;
+  onClose?: () => void;
+  onToggle?: () => void;
 }
 
-export function Sidebar({ role, query = "" }: SidebarProps) {
+export function Sidebar({ role, open = false, onClose, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const items = navItems.filter((item) => item.roles.includes(role));
   const { data: notifications = [] } = useQuery({
@@ -58,22 +60,27 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
   const unreadCount = notifications.length;
 
   return (
-    <aside className="flex w-52 flex-col border-r border-border bg-surfaceElevated">
-      <div className="border-b border-border p-4">
-        <Link href="/" className="text-lg font-semibold text-white">
+    <aside
+      className={clsx(
+        "fixed left-0 top-0 z-30 flex h-screen w-52 shrink-0 flex-col border-r border-border bg-surfaceElevated transition-transform duration-200 md:relative md:z-0 md:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}
+    >
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 md:justify-start">
+        <Link href="/dashboard" className="text-lg font-semibold text-white" onClick={onClose}>
           ShiftSync
         </Link>
       </div>
-      <nav className="flex-1 space-y-0.5 p-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const href = `${item.href}${query}`;
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           const showNotificationBadge = item.href === "/dashboard/notifications" && unreadCount > 0;
           return (
             <Link
               key={item.href}
-              href={href}
+              href={item.href}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
                 isActive ? "bg-accent/20 text-accent" : "text-muted hover:bg-border/50 hover:text-gray-200"
@@ -90,7 +97,7 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
                   </span>
                 )}
               </span>
-              {item.label}
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
@@ -102,7 +109,7 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
           className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-border/50 hover:text-gray-200"
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          Log out
+          <span className="truncate">Log out</span>
         </button>
       </div>
     </aside>

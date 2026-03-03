@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { DashboardLayout } from "./DashboardLayout";
 
@@ -8,17 +7,8 @@ const VALID_ROLES = ["admin", "manager", "staff"] as const;
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  const searchParams = useSearchParams();
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
-        <p className="text-muted">Loading…</p>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (!user && !isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
         <div className="text-center">
@@ -31,13 +21,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const role = VALID_ROLES.includes(user.role as (typeof VALID_ROLES)[number])
+  const role = user && VALID_ROLES.includes(user.role as (typeof VALID_ROLES)[number])
     ? (user.role as "admin" | "manager" | "staff")
     : "staff";
-  const userId = String(user.id);
-  const query = "?" + searchParams.toString();
+
   return (
-    <DashboardLayout role={role} userId={userId} query={query}>
+    <DashboardLayout role={role} userId={user ? String(user.id) : null} loading={isLoading && !user}>
       {children}
     </DashboardLayout>
   );
