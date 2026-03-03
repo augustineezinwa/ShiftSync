@@ -10,7 +10,7 @@ export function Badge({ children, variant = "default", className }: BadgeProps) 
   return (
     <span
       className={clsx(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
         variant === "default" && "bg-accentMuted text-blue-200",
         variant === "success" && "bg-success/20 text-success",
         variant === "warning" && "bg-warning/20 text-warning",

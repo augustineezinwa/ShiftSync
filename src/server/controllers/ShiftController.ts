@@ -5,7 +5,7 @@ import { toZonedTime } from "date-fns-tz";
 import { HTTPException } from "hono/http-exception";
 import { and, eq, inArray } from "drizzle-orm";
 import { getQualifiedUsersForShift } from "../utils/qualifiedList";
-import { getDateInTimezone, getWeeklyProjectedOvertimeCost } from "../utils/timezone";
+import { getDateInTimezone, getFairnessAnalysis, getWeeklyProjectedOvertimeCost, groupUsersByWeeklyHours } from "../utils/timezone";
 
 type Shift = typeof shifts.$inferSelect & {
     location: typeof locations.$inferSelect | null;
@@ -365,8 +365,22 @@ class ShiftController {
     }
 
     static async getOverTimeCostsForWeeklySchedule(weekStart: string, weekEnd: string) {
+        console.log("weekStart", weekStart);
+        console.log("weekEnd", weekEnd);
         const shifts = await ShiftController.getShifts(weekStart, weekEnd);
         return getWeeklyProjectedOvertimeCost(shifts);
+    }
+
+    static async getUsersByWeeklyHours(weekStart: string, weekEnd: string, locationIds: number[]) {
+        const shifts = await ShiftController.getShifts(weekStart, weekEnd)
+        const shiftsInUserLocations = shifts.filter((s) => s.locationId && locationIds.includes(s.locationId));
+        return groupUsersByWeeklyHours(shiftsInUserLocations);
+    }
+
+    static async getFairnessAnalytics(weekStart: string, weekEnd: string, locationIds: number[]) {
+        const shifts = await ShiftController.getShifts(weekStart, weekEnd)
+        const shiftsInUserLocations = shifts.filter((s) => s.locationId && locationIds.includes(s.locationId));
+        return getFairnessAnalysis(shiftsInUserLocations);
     }
 }
 

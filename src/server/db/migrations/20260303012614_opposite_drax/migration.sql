@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "hours_per_week" integer DEFAULT 40;

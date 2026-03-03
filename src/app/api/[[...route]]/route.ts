@@ -260,6 +260,22 @@ const appRoutes = app
     const costs = await ShiftController.getOverTimeCostsForWeeklySchedule(weekStart, weekEnd);
     return c.json({ costs });
   })
+  .get("/shifts/users-by-weekly-hours", checkAuthMiddleware, allowAdminOrManagerMiddleware, async (c) => {
+    const weekStart = c.req.query("weekStart");
+    const weekEnd = c.req.query("weekEnd");
+    const locationIds = c.get("locations").map((l) => l.id);
+    if (!weekStart || !weekEnd) return c.json({ error: "Week start and end are required" }, 400);
+    const users = await ShiftController.getUsersByWeeklyHours(weekStart, weekEnd, locationIds);
+    return c.json({ users });
+  })
+  .get("/shifts/fairness-analytics", checkAuthMiddleware, allowAdminOrManagerMiddleware, async (c) => {
+    const weekStart = c.req.query("weekStart");
+    const weekEnd = c.req.query("weekEnd");
+    const locationIds = c.get("locations").map((l) => l.id);
+    if (!weekStart || !weekEnd) return c.json({ error: "Week start and end are required" }, 400);
+    const analytics = await ShiftController.getFairnessAnalytics(weekStart, weekEnd, locationIds);
+    return c.json({ analytics });
+  })
   .get("/shifts/:id", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
     const id = Number(c.req.param("id"));
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);

@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card } from "@/components/ui/Card";
+import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   getShifts,
+  getOvertimeCosts,
   getSkills,
   createShift,
   getUsers,
@@ -14,6 +15,7 @@ import {
   publishShifts,
   deleteShift,
   type ApiShift,
+  type OvertimeCostsResponse,
   isValidationError,
 } from "@/lib/api";
 import { ShiftModal, type ShiftFormValues } from "@/components/shifts/ShiftModal";
@@ -58,6 +60,7 @@ export function ManagerShiftsView() {
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedWeekValue, setSelectedWeekValue] = useState(getDefaultWeekValue);
   const [publishSubmitting, setPublishSubmitting] = useState(false);
+  const [overtimeCosts, setOvertimeCosts] = useState<OvertimeCostsResponse | null>(null);
 
   const loadShifts = useCallback(async (weekRange?: WeekRange | null) => {
     setLoading(true);
@@ -94,10 +97,27 @@ export function ManagerShiftsView() {
     }
   }, []);
 
+  const loadOvertimeCosts = useCallback(async (weekRange: WeekRange | null) => {
+    if (!weekRange) {
+      setOvertimeCosts(null);
+      return;
+    }
+    try {
+      const data = await getOvertimeCosts({
+        weekStart: weekRange.start,
+        weekEnd: weekRange.end,
+      });
+      setOvertimeCosts(data);
+    } catch {
+      setOvertimeCosts(null);
+    }
+  }, []);
+
   useEffect(() => {
     const range = valueToWeekRange(selectedWeekValue);
     loadShifts(range ?? undefined);
-  }, [selectedWeekValue, loadShifts]);
+    loadOvertimeCosts(range);
+  }, [selectedWeekValue, loadShifts, loadOvertimeCosts]);
 
   useEffect(() => {
     loadSkills();
@@ -131,9 +151,33 @@ export function ManagerShiftsView() {
     }
   };
 
+  const costs = overtimeCosts?.costs;
+
   return (
     <>
       <h1 className="mb-6 text-2xl font-semibold text-white">Shifts</h1>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="text-muted">Overtime cost</CardHeader>
+          <p className="text-2xl font-semibold text-white">
+            {costs != null
+              ? new Intl.NumberFormat(undefined, {
+                  style: "currency",
+                  currency: "USD",
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }).format(costs.totalOvertimeCost)
+              : "—"}
+          </p>
+        </Card>
+        <Card>
+          <CardHeader className="text-muted">Overtime hours</CardHeader>
+          <p className="text-2xl font-semibold text-white">
+            {costs != null ? `${Number(costs.overtimeHours).toFixed(1)} h` : "—"}
+          </p>
+          <p className="mt-2 text-xs text-muted">Average rate ($100/hr)</p>
+        </Card>
+      </div>
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>

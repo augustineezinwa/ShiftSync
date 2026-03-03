@@ -1,76 +1,153 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "@/components/ui/Table";
-import { SectionFilters } from "@/components/dashboard/SectionFilters";
-import { STAFF, getFairnessRows, type FairnessStatus, type Role } from "@/lib/mock-data";
+import { getFairnessAnalytics, type FairnessAnalyticsResponse } from "@/lib/api";
+import {
+  getUpcomingWeekRanges,
+  formatWeekRangeLabel,
+  weekRangeToValue,
+  valueToWeekRange,
+  isCurrentWeek,
+  type WeekRange,
+} from "@/lib/week-ranges";
 
-const STATUS_LABELS: Record<FairnessStatus, string> = {
-  under: "Under-scheduled",
-  even: "Normal",
-  over: "Overscheduled",
+type FairnessRow = FairnessAnalyticsResponse["analytics"][number];
+
+const STATUS_LABELS: Record<string, string> = {
+  Under: "Under-scheduled",
+  Balanced: "Normal",
+  Over: "Overscheduled",
 };
 
-const STATUS_VARIANTS: Record<FairnessStatus, "warning" | "success" | "danger"> = {
-  under: "warning",
-  even: "success",
-  over: "danger",
+const STATUS_VARIANTS: Record<string, "warning" | "success" | "danger"> = {
+  Under: "warning",
+  Balanced: "success",
+  Over: "danger",
 };
 
-interface PageProps {
-  searchParams: Promise<{ role?: string; userId?: string; locations?: string; dateFrom?: string; dateTo?: string }>;
+function getDefaultWeekValue(): string {
+  const opts = getUpcomingWeekRanges();
+  const current = opts.find(isCurrentWeek);
+  return current ? weekRangeToValue(current) : (opts[2] ? weekRangeToValue(opts[2]) : "");
 }
 
-export default async function FairnessPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const { role, userId, locations: locationsParam, dateFrom, dateTo } = params;
-  const currentUser = userId ? STAFF.find((s) => s.id === userId) : null;
-  const managerLocationIds = currentUser?.role === "manager" ? currentUser.locationIds : undefined;
-  const locationIds = locationsParam ? locationsParam.split(",").filter(Boolean) : managerLocationIds;
-  const rows = getFairnessRows(locationIds, dateFrom, dateTo);
+export default function FairnessPage() {
+  const weekOptions = getUpcomingWeekRanges();
+  const [selectedWeekValue, setSelectedWeekValue] = useState(getDefaultWeekValue);
+  const [data, setData] = useState<FairnessAnalyticsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadFairnessAnalytics = useCallback(async (weekRange: WeekRange | null) => {
+    if (!weekRange) {
+      setData(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getFairnessAnalytics({
+        weekStart: weekRange.start,
+        weekEnd: weekRange.end,
+      });
+      setData(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load fairness analytics");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const range = valueToWeekRange(selectedWeekValue);
+    loadFairnessAnalytics(range);
+  }, [selectedWeekValue, loadFairnessAnalytics]);
+
+  const rows: FairnessRow[] = data?.analytics ?? [];
 
   return (
     <>
       <h1 className="mb-6 text-2xl font-semibold text-white">Fairness</h1>
-      <SectionFilters role={role as Role} userId={userId} />
       <Card className="mb-6">
-        <CardHeader>Premium shift distribution (Fri/Sat evening)</CardHeader>
-        <p className="mb-3 text-sm text-muted">
-          Team median = median of premium shift counts at this location. Premium diff = team median −
-          premium shifts. Status is from premium diff (under-scheduled / normal / overscheduled).
-        </p>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <Th>Location</Th>
-              <Th>Staff</Th>
-              <Th>Assigned hrs</Th>
-              <Th>Desired hrs</Th>
-              <Th>Premium shifts</Th>
-              <Th>Team median</Th>
-              <Th>Premium diff</Th>
-              <Th>Status</Th>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={`${r.staffId}-${r.locationId}`}>
-                <Td>{r.locationName}</Td>
-                <Td className="font-medium text-gray-100">{r.staffName}</Td>
-                <Td>{r.assignedHours}h</Td>
-                <Td>{r.desiredHours}h</Td>
-                <Td>{r.premiumShifts}</Td>
-                <Td>{r.teamMedian}</Td>
-                <Td>{r.premiumDiff >= 0 ? `+${r.premiumDiff}` : r.premiumDiff}</Td>
-                <Td>
-                  <Badge variant={STATUS_VARIANTS[r.status]}>
-                    {STATUS_LABELS[r.status]}
-                  </Badge>
-                </Td>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <CardHeader className="border-0 pb-0">
+              Premium shift distribution (Fri/Sat evening)
+            </CardHeader>
+            <p className="mt-1 text-sm text-muted">
+              Team median = median of assigned hours. Fairness diff = assigned hrs − team median.
+              Overload diff = assigned hrs − desired hrs. Status is from overload diff
+              (under-scheduled / normal / overscheduled).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="fairness-week" className="text-sm text-muted">
+              Current schedule
+            </label>
+            <select
+              id="fairness-week"
+              value={selectedWeekValue}
+              onChange={(e) => setSelectedWeekValue(e.target.value)}
+              className="rounded border border-border bg-surface px-3 py-2 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {weekOptions.map((range) => (
+                <option key={weekRangeToValue(range)} value={weekRangeToValue(range)}>
+                  {formatWeekRangeLabel(range, isCurrentWeek(range))}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {error && <p className="p-4 text-center text-danger">{error}</p>}
+        {!error && (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <Th className="min-w-[7rem]">Location</Th>
+                <Th className="min-w-[8rem]">Staff</Th>
+                <Th className="min-w-[6rem]">Assigned hrs</Th>
+                <Th className="min-w-[6rem]">Desired hrs</Th>
+                <Th className="min-w-[6rem]">Premium shifts</Th>
+                <Th className="min-w-[6rem]">Team median</Th>
+                <Th className="min-w-[6rem]">Fairness diff</Th>
+                <Th className="min-w-[6rem]">Overload diff</Th>
+                <Th className="min-w-[8rem]">Status</Th>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {rows.length === 0 && (
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <Td colSpan={9} className="p-4 text-center text-muted">
+                    Loading…
+                  </Td>
+                </TableRow>
+              ) : (
+                rows.map((r) => (
+                  <TableRow key={`${r.id}-${r.location ?? "noloc"}`}>
+                    <Td className="min-w-[7rem]">{r.location ?? "—"}</Td>
+                    <Td className="min-w-[8rem] font-medium text-gray-100">{r.name}</Td>
+                    <Td className="min-w-[6rem]">{Number(r.assignedHours).toFixed(1)}h</Td>
+                    <Td className="min-w-[6rem]">{Number(r.desiredHours).toFixed(1)}h</Td>
+                    <Td className="min-w-[6rem]">{r.premiumShifts}</Td>
+                    <Td className="min-w-[6rem]">{Number(r.teamMedian).toFixed(1)}</Td>
+                    <Td className="min-w-[6rem]">{r.fairnessDiff >= 0 ? `+${r.fairnessDiff}` : r.fairnessDiff}</Td>
+                    <Td className="min-w-[6rem]">{r.overloadDiff >= 0 ? `+${r.overloadDiff}` : r.overloadDiff}</Td>
+                    <Td className="min-w-[8rem] whitespace-nowrap">
+                      <Badge variant={STATUS_VARIANTS[r.status] ?? "success"} className="whitespace-nowrap">
+                        {STATUS_LABELS[r.status] ?? r.status}
+                      </Badge>
+                    </Td>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+        {!error && !loading && rows.length === 0 && (
           <p className="p-4 text-center text-muted">No staff in selected locations.</p>
         )}
       </Card>

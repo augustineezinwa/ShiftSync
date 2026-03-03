@@ -1,5 +1,5 @@
-import { addDays, format, parseISO, subDays } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
+import { addDays, eachHourOfInterval, format, getDay, getHours, parseISO, subDays } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { locations, shifts, skills, users } from "../db/schema";
 
 const WEEKLY_LIMIT = 40;
@@ -84,6 +84,9 @@ export function getWeeklyProjectedOvertimeCost(shifts: Shift[]) {
   shifts.forEach(s => {
     const hours = durationHours(new Date(s.startTime), new Date(s.endTime));
 
+    console.log("hours", hours);
+    console.log("s.users", s.users);
+
     for (const user of s.users) {
       if (!userMap.has(user.id)) {
         userMap.set(user.id, { hours, rate: user.hourlyRate || 0 });
@@ -94,11 +97,126 @@ export function getWeeklyProjectedOvertimeCost(shifts: Shift[]) {
   });
 
   let totalOvertimeCost = 0;
+  let totalOvertimeHours = 0;
+
 
   for (const { hours, rate } of Array.from(userMap.values())) {
     const overtimeHours = Math.max(hours - WEEKLY_LIMIT, 0);
+    totalOvertimeHours += overtimeHours;
     totalOvertimeCost += overtimeHours * rate * OVERTIME_MULTIPLIER;
   }
 
-  return { totalOvertimeCost, overtimeHours: totalOvertimeCost / OVERTIME_MULTIPLIER };
+  return { totalOvertimeCost, overtimeHours: totalOvertimeHours };
+}
+
+export function groupUsersByWeeklyHours(shifts: Shift[]) {
+  const userMap = new Map<number, { id: number, name: string, weeklyHours: number, notes: string, status: string }>();
+
+  shifts.forEach(s => {
+    for (const user of s.users) {
+      if (!userMap.has(user.id)) {
+        userMap.set(user.id, { id: user.id, name: user.name, weeklyHours: 0, notes: getWarningsFromHours(0), status: getStatusFromHours(0) });
+      }
+      userMap.get(user.id)!.weeklyHours += durationHours(new Date(s.startTime), new Date(s.endTime));
+      userMap.get(user.id)!.notes = getWarningsFromHours(userMap.get(user.id)!.weeklyHours);
+      userMap.get(user.id)!.status = getStatusFromHours(userMap.get(user.id)!.weeklyHours);
+    }
+  });
+
+  return Array.from(userMap.values());
+}
+
+export function getStatusFromHours(hours: number) {
+  if (hours < 40) return "✅ OK";
+  if (hours === 40) return "⚠️ At weekly limit";
+  return "🔴 Over";
+}
+
+export function getWarningsFromHours(hours: number) {
+  if (hours < 35) return "";
+  if (hours === 35) return "Approaching 40h warning";
+  if (hours === 40) return "At weekly limit";
+  return "Weekly hours exceeded 40h";
+}
+
+export function isPremiumShift(shift: Shift): boolean {
+  const tz = shift.location?.timezone ?? "UTC";
+
+  const localStart = toZonedTime(shift.startTime, tz);
+  const localEnd = toZonedTime(shift.endTime, tz);
+
+  const hours = eachHourOfInterval({ start: localStart, end: localEnd });
+
+  return hours.some(date => {
+    const day = getDay(date);
+    const hour = getHours(date);
+    return (day === 5 || day === 6) && hour >= 18;
+  });
+}
+
+export function getFairnessAnalysis(shifts: Shift[]) {
+  const userMap = new Map<number, {
+    id: number;
+    name: string;
+    location: string | undefined;
+    assignedHours: number;
+    desiredHours: number;
+    premiumShifts: number;
+  }>();
+
+  shifts.forEach(s => {
+    const hours = durationHours(s.startTime, s.endTime);
+    const premium = isPremiumShift(s);
+
+    for (const user of s.users) {
+      if (!userMap.has(user.id)) {
+        userMap.set(user.id, {
+          id: user.id,
+          name: user.name,
+          location: s.location?.name,
+          desiredHours: user.hoursPerWeek ?? 0,
+          assignedHours: hours,
+          premiumShifts: premium ? 1 : 0
+        });
+      } else {
+        const entry = userMap.get(user.id)!;
+        entry.assignedHours += hours;
+        if (premium) entry.premiumShifts += 1;
+      }
+    }
+  });
+
+  const users = Array.from(userMap.values());
+
+  const sortedHours = users
+    .map(u => u.assignedHours)
+    .sort((a, b) => a - b);
+
+  const mid = Math.floor(sortedHours.length / 2);
+
+  const teamMedian =
+    sortedHours.length === 0
+      ? 0
+      : sortedHours.length % 2 === 0
+        ? (sortedHours[mid - 1] + sortedHours[mid]) / 2
+        : sortedHours[mid];
+
+  return users.map(u => {
+    const fairnessDiff = u.assignedHours - teamMedian;
+    const overloadDiff = u.assignedHours - u.desiredHours;
+
+    let status: "Under" | "Balanced" | "Over";
+
+    if (overloadDiff > 0) status = "Over";
+    else if (overloadDiff < 0) status = "Under";
+    else status = "Balanced";
+
+    return {
+      ...u,
+      teamMedian,
+      fairnessDiff,
+      overloadDiff,
+      status
+    };
+  });
 }

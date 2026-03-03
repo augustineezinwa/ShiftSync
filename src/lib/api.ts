@@ -235,6 +235,51 @@ export async function getShifts(params?: { weekStart?: string; weekEnd?: string 
 /** Single shift type from GET /shifts response (array element) */
 export type ApiShift = Awaited<ReturnType<typeof getShifts>>[number];
 
+/** Overtime costs for a week (manager). Requires weekStart and weekEnd. */
+export async function getOvertimeCosts(params: { weekStart: string; weekEnd: string }) {
+    const url = `/api/shifts/overtime-costs?weekStart=${encodeURIComponent(params.weekStart)}&weekEnd=${encodeURIComponent(params.weekEnd)}`;
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data && typeof data === "object" && "error" in data)
+            throw new Error((data as { error: string }).error);
+        throw new Error("Failed to fetch overtime costs");
+    }
+    return res.json();
+}
+
+export type OvertimeCostsResponse = Awaited<ReturnType<typeof getOvertimeCosts>>;
+
+/** Users by weekly hours for a week (manager). Uses manager's locations from auth. */
+export async function getUsersByWeeklyHours(params: { weekStart: string; weekEnd: string }) {
+    const url = `/api/shifts/users-by-weekly-hours?weekStart=${encodeURIComponent(params.weekStart)}&weekEnd=${encodeURIComponent(params.weekEnd)}`;
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data && typeof data === "object" && "error" in data)
+            throw new Error((data as { error: string }).error);
+        throw new Error("Failed to fetch users by weekly hours");
+    }
+    return res.json();
+}
+
+export type UsersByWeeklyHoursResponse = Awaited<ReturnType<typeof getUsersByWeeklyHours>>;
+
+/** Fairness analytics for a week (admin/manager). Uses current user's locations from auth. */
+export async function getFairnessAnalytics(params: { weekStart: string; weekEnd: string }) {
+    const url = `/api/shifts/fairness-analytics?weekStart=${encodeURIComponent(params.weekStart)}&weekEnd=${encodeURIComponent(params.weekEnd)}`;
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data && typeof data === "object" && "error" in data)
+            throw new Error((data as { error: string }).error);
+        throw new Error("Failed to fetch fairness analytics");
+    }
+    return res.json();
+}
+
+export type FairnessAnalyticsResponse = Awaited<ReturnType<typeof getFairnessAnalytics>>;
+
 /** Shifts assigned to the current user (staff). Optional week filter; uses shift location timezone. */
 export async function getMyShifts(params?: { weekStart?: string; weekEnd?: string }) {
     const url =
