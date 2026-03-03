@@ -1,11 +1,13 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Table, TableHead, TableBody, TableRow, Th, Td } from "@/components/ui/Table";
 import { SectionFilters } from "@/components/dashboard/SectionFilters";
 import { StaffDashboardView } from "@/components/dashboard/StaffDashboardView";
 import { useAuth } from "@/providers/AuthProvider";
-import { LOCATIONS, SHIFTS, getOnDutyNow, type Role } from "@/lib/mock-data";
+import { SHIFTS, getOnDutyNow, type Role } from "@/lib/mock-data";
+import { getLocations } from "@/lib/api";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -14,12 +16,24 @@ export default function DashboardPage() {
   const isManager = role === "manager";
   const isAdmin = role === "admin";
 
+  const { data: locationsData } = useQuery({
+    queryKey: ["locations"],
+    queryFn: getLocations,
+    enabled: isAdmin,
+  });
+
   if (isStaff) {
     return <StaffDashboardView />;
   }
 
   const locationIds: string[] = user?.locations?.map((l: { id: number }) => String(l.id)) ?? [];
   const onDutyNow = isAdmin ? getOnDutyNow(locationIds) : [];
+
+  const locationsCount = isAdmin
+    ? Array.isArray(locationsData)
+      ? locationsData.length
+      : "—"
+    : 0;
 
   return (
     <>
@@ -30,7 +44,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="text-muted">Locations</CardHeader>
               <p className="text-2xl font-semibold text-white">
-                {locationIds?.length ?? LOCATIONS.length}
+                {locationsCount}
               </p>
             </Card>
             <Card>
