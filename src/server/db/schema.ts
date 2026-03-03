@@ -10,7 +10,7 @@ export const swapRequestsStatusEnum = pgEnum("swap_requests_status", ["pending",
 
 export const auditLogsActionEnum = pgEnum("audit_logs_action", ["create", "update", "delete", "read"]);
 
-export const notificationsTypeEnum = pgEnum("notifications_type", ["shift_assigned", "swap_request", "schedule_published", "overtime_warning", "availability_change"]);
+export const notificationsTypeEnum = pgEnum("notifications_type", ["shift_assigned", "swap_request", "schedule_published", "overtime_warning", "availability_change", "shift_changed", "request_updated", "swap_request_needing_manager_approval", "request_approved"]);
 export const users = pgTable("users", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: text().notNull(),

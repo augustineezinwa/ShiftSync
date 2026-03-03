@@ -1,0 +1,1 @@
+ALTER TYPE "notifications_type" ADD VALUE 'shift_changed';

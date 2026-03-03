@@ -1,4 +1,5 @@
 import { db } from "@/server/db";
+import { event, NEW_SHIFT_ASSIGNED, SCHEDULE_PUBLISHED, SHIFT_CHANGED, SWAP_REQUEST_UPDATED } from "@/server/events";
 import { locations, shifts, skills, swapRequests, users, usersShifts } from "@/server/db/schema";
 import { eachDayOfInterval, addHours, subDays, format, parseISO } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -31,6 +32,8 @@ class ShiftController {
             .set({ locationId, skillId, startTime, endTime, headcount })
             .where(eq(shifts.id, id))
             .returning();
+
+        event.emit(SHIFT_CHANGED, { shiftId: id });
 
         await db
             .update(swapRequests)
@@ -65,6 +68,7 @@ class ShiftController {
 
     static async publishSchedule(ids: number[]) {
         const list = await db.update(shifts).set({ status: "published" }).where(inArray(shifts.id, ids)).returning();
+        event.emit(SCHEDULE_PUBLISHED, { shiftIds: ids });
         return list;
     }
 
@@ -123,6 +127,7 @@ class ShiftController {
         await db.insert(usersShifts).values(
             toInsert.map((userId) => ({ shiftId, userId }))
         );
+        event.emit(NEW_SHIFT_ASSIGNED, { shiftId, userIds });
         const shift = await ShiftController.getShift(shiftId);
         await db
             .update(swapRequests)
@@ -147,7 +152,7 @@ class ShiftController {
 
     static async unassignUserFromShift(shiftId: number, userId: number) {
         await db.delete(usersShifts).where(and(eq(usersShifts.shiftId, shiftId), eq(usersShifts.userId, userId)));
-        await db
+        const updatedRequests = await db
             .update(swapRequests)
             .set({ status: "cancelled" })
             .where(
@@ -164,7 +169,12 @@ class ShiftController {
                         "pending",
                     ])
                 )
-            );
+            ).returning();
+
+        const targetUserIds = updatedRequests.map(request => request.targetUserId).filter(Boolean);
+        const requesterIds = updatedRequests.map(request => request.requesterId).filter(Boolean);
+        event.emit(SHIFT_CHANGED, { shiftId, userId });
+        event.emit(SWAP_REQUEST_UPDATED, { targetUserIds, requesterIds });
         return ShiftController.getShift(shiftId);
     }
 
@@ -381,6 +391,21 @@ class ShiftController {
         const shifts = await ShiftController.getShifts(weekStart, weekEnd)
         const shiftsInUserLocations = shifts.filter((s) => s.locationId && locationIds.includes(s.locationId));
         return getFairnessAnalysis(shiftsInUserLocations);
+    }
+
+    static async getShiftsByIds(ids: number[]) {
+        return await db.query.shifts.findMany({
+            with: {
+                location: true,
+                skill: true,
+                users: true,
+            },
+            where: {
+                id: {
+                    in: ids
+                }
+            }
+        });
     }
 }
 

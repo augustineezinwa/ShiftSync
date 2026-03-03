@@ -3,6 +3,7 @@ import { shifts, swapRequests, usersShifts } from "../db/schema";
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import ShiftController from "./ShiftController";
+import { event, SWAP_REQUEST_APPROVED, SWAP_REQUEST_NEEDING_APPROVAL } from "../events";
 
 export type RequestStatus = "pending" | "pending_manager_approval" | "accepted" | "rejected" | "cancelled";
 
@@ -91,14 +92,17 @@ class RequestController {
 
         if (oldRequest?.status === "pending" && request.status === 'pending_manager_approval' && request.type === 'drop') {
             await db.update(swapRequests).set({ targetUserId: userId }).where(eq(swapRequests.id, requestId));
+            event.emit(SWAP_REQUEST_NEEDING_APPROVAL, { userId });
         }
 
 
         if (oldRequest?.status === "pending_manager_approval" && request.type === 'swap' && request.status === 'accepted') {
             await db.update(usersShifts).set({ userId: Number(request.requesterId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
+            event.emit(SWAP_REQUEST_APPROVED, { requesterId: request.requesterId });
         } else if (oldRequest?.status === "pending_manager_approval" && request.type === 'drop' && request.status === 'accepted') {
             await db.update(swapRequests).set({ userShiftId: null }).where(eq(swapRequests.shiftId, request.shiftId));
             await db.update(usersShifts).set({ userId: Number(request.targetUserId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
+            event.emit(SWAP_REQUEST_APPROVED, { requesterId: request.requesterId });
         }
 
         return request;

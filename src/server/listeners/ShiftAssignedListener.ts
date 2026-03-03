@@ -13,8 +13,8 @@ export default class ShiftAssignedListener {
 
 }
 
-function handleShiftAssigned({ userId, shiftId }: { userId: number, shiftId: number }) {
-    console.log(`Shift ${shiftId} assigned to user ${userId}`);
+function handleShiftAssigned({ userIds, shiftId }: { userIds: number[], shiftId: number }) {
+    console.log(`Shift ${shiftId} assigned to user ${userIds.join(', ')}`);
 
     void (async () => {
         const shift = await ShiftController.getShift(shiftId);
@@ -24,7 +24,7 @@ function handleShiftAssigned({ userId, shiftId }: { userId: number, shiftId: num
             new Date(shift?.startTime ?? ''),
             shift?.location?.timezone ?? 'UTC'
         )} to ${formatTimeInTz(new Date(shift?.endTime ?? ''), shift?.location?.timezone ?? 'UTC')}.`;
-        await NotificationController.createNotification(userId, title, message, 'shift_assigned');
+        await NotificationController.createBulkNotifications(userIds.map(userId => ({ userId, title, message, type: 'shift_assigned' })));
     })();
 
 }
