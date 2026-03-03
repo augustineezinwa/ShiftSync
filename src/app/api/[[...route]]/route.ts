@@ -39,6 +39,7 @@ import { createRequestSchema, updateRequestStatusSchema } from "@/server/validat
 import RequestController from "@/server/controllers/RequestController";
 import { validateRequestWriteMiddleware } from "@/server/middlewares/validateRequestWrite";
 import { enforceLimitOnRequestMiddleware } from "@/server/middlewares/enforceLimitOnRequest";
+import NotificationController from "@/server/controllers/NotificationController";
 
 type Bindings = {
   db: typeof db
@@ -150,6 +151,17 @@ const appRoutes = app
     const { userId, locationId } = await c.req.json();
     const location = await LocationController.unassignLocationFromUser(userId, locationId);
     return c.json(location);
+  })
+  .get("/me/notifications", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const notifications = await NotificationController.getNotifications(userId);
+    return c.json(notifications);
+  })
+  .put("/me/notifications/:id", checkAuthMiddleware, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+    const notification = await NotificationController.updateNotification(id);
+    return c.json(notification);
   })
   .post("/me/availability", validate(createUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
     const { dayOfWeek, startTime, endTime } = await c.req.json();

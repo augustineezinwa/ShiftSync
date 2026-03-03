@@ -220,3 +220,12 @@ export function getFairnessAnalysis(shifts: Shift[]) {
     };
   });
 }
+
+
+/** Format a Date in a given timezone */
+export function formatTimeInTz(date: Date | string, tz: string) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const zoned = toZonedTime(d, tz);
+  return format(zoned, "EEE, MMM d yyyy 'at' HH:mm");
+}
+

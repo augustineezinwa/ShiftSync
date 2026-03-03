@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   LayoutDashboard,
@@ -16,7 +17,7 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
-import { logout } from "@/lib/api";
+import { logout, getMyNotifications, MY_NOTIFICATIONS_QUERY_KEY } from "@/lib/api";
 import type { Role } from "@/lib/mock-data";
 
 interface NavItem {
@@ -49,6 +50,12 @@ interface SidebarProps {
 export function Sidebar({ role, query = "" }: SidebarProps) {
   const pathname = usePathname();
   const items = navItems.filter((item) => item.roles.includes(role));
+  const { data: notifications = [] } = useQuery({
+    queryKey: MY_NOTIFICATIONS_QUERY_KEY,
+    queryFn: getMyNotifications,
+    refetchInterval: 20_000,
+  });
+  const unreadCount = notifications.length;
 
   return (
     <aside className="flex w-52 flex-col border-r border-border bg-surfaceElevated">
@@ -62,6 +69,7 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
           const Icon = item.icon;
           const href = `${item.href}${query}`;
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const showNotificationBadge = item.href === "/dashboard/notifications" && unreadCount > 0;
           return (
             <Link
               key={item.href}
@@ -71,7 +79,17 @@ export function Sidebar({ role, query = "" }: SidebarProps) {
                 isActive ? "bg-accent/20 text-accent" : "text-muted hover:bg-border/50 hover:text-gray-200"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <span className="relative shrink-0">
+                <Icon className="h-4 w-4" />
+                {showNotificationBadge && (
+                  <span
+                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white"
+                    aria-label={`${unreadCount} unread notifications`}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
               {item.label}
             </Link>
           );

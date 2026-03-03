@@ -60,6 +60,32 @@ export async function getMe() {
 
 export type AuthUser = NonNullable<Awaited<ReturnType<typeof getMe>>>;
 
+// --- Me notifications ---
+
+export async function getMyNotifications(): Promise<MyNotification[]> {
+    const res = await api.me.notifications.$get();
+    if (!res.ok) throw new Error("Failed to fetch notifications");
+    return res.json();
+}
+
+export interface MyNotification {
+    id: number;
+    title: string | null;
+    message: string;
+    type: string;
+    createdAt: string;
+    readAt?: string | null;
+}
+
+export async function markNotificationRead(id: number) {
+    const res = await api.me.notifications[":id"].$put({ param: { id: String(id) } });
+    if (!res.ok) throw new Error("Failed to mark notification as read");
+    return res.json();
+}
+
+/** Query key for polling my notifications (shared by sidebar and notifications page). */
+export const MY_NOTIFICATIONS_QUERY_KEY = ["me", "notifications"] as const;
+
 // --- Me availability (staff profile) ---
 
 export async function getMeAvailability() {
