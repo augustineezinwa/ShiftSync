@@ -8,7 +8,7 @@ import { event, SWAP_REQUEST_APPROVED, SWAP_REQUEST_NEEDING_APPROVAL } from "../
 export type RequestStatus = "pending" | "pending_manager_approval" | "accepted" | "rejected" | "cancelled";
 
 class RequestController {
-    static async createRequest(requesterId: number, type: "swap" | "drop", userShiftId: number, targetUserId?: number) {
+    static async createRequest(requesterId: number, type: "swap" | "drop", userShiftId: number, targetUserId?: number, receiverShiftId?: number) {
         const shift = await db.query.shifts.findFirst({
             where: {
                 id: userShiftId
@@ -17,13 +17,23 @@ class RequestController {
                 usersShifts: true,
             }
         });
+        let receiverShiftAssignment = null;
+        if (receiverShiftId) {
+            receiverShiftAssignment = await db.query.usersShifts.findFirst({
+                where: {
+                    shiftId: receiverShiftId,
+                    userId: targetUserId
+                }
+            });
+        }
+
         if (targetUserId && type === 'swap') {
 
             const shiftAssignment = shift?.usersShifts.find((s) => s.userId === targetUserId);
             if (!shiftAssignment) {
                 throw new HTTPException(400, { message: "Target user is not assigned to this shift" });
             }
-            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId }).returning();
+            const [request] = await db.insert(swapRequests).values({ requesterId, type, userShiftId: shiftAssignment.id, shiftId: userShiftId, targetUserId, receiverShiftAssignmentId: receiverShiftAssignment?.id ?? null }).returning();
             return request;
 
         } else {
@@ -98,6 +108,7 @@ class RequestController {
 
         if (oldRequest?.status === "pending_manager_approval" && request.type === 'swap' && request.status === 'accepted') {
             await db.update(usersShifts).set({ userId: Number(request.requesterId) }).where(eq(usersShifts.id, Number(request.userShiftId)));
+            await db.update(usersShifts).set({ userId: Number(request.targetUserId) }).where(eq(usersShifts.id, Number(request.receiverShiftAssignmentId)));
             event.emit(SWAP_REQUEST_APPROVED, { requesterId: request.requesterId });
         } else if (oldRequest?.status === "pending_manager_approval" && request.type === 'drop' && request.status === 'accepted') {
             await db.update(swapRequests).set({ userShiftId: null }).where(eq(swapRequests.shiftId, request.shiftId));

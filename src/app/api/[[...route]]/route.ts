@@ -354,10 +354,19 @@ const appRoutes = app
     const shifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
     return c.json(shifts);
   })
+  .get("/me/shifts/external/users/:userId/qualified", checkAuthMiddleware, async (c) => {
+    const userId = Number(c.req.param("userId"));
+    if (Number.isNaN(userId)) return c.json({ error: "Invalid id" }, 400);
+    const user = await UserController.getUser(userId);
+    if (!user) return c.json({ error: "User not found" }, 404);
+    const locationIds = user.locations.map((l) => l.id);
+    const shifts = await ShiftController.getQualifiedShiftsForUser(userId, locationIds);
+    return c.json({ shifts });
+  })
   .post("/my/requests", validate(createRequestSchema), checkAuthMiddleware, enforceLimitOnRequestMiddleware, async (c) => {
-    const { type, userShiftId, targetUserId } = c.req.valid("json");
+    const { type, userShiftId, targetUserId, receiverShiftId } = c.req.valid("json");
     const requesterId = c.get("userId");
-    const request = await RequestController.createRequest(requesterId, type, userShiftId, targetUserId);
+    const request = await RequestController.createRequest(requesterId, type, userShiftId, targetUserId, receiverShiftId);
     return c.json(request);
   })
   .get("/my/requests", checkAuthMiddleware, async (c) => {

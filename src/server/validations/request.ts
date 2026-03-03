@@ -6,6 +6,7 @@ export const createRequestSchema = z.object({
     userShiftId: z.number(),
     targetUserId: z.number().optional(),
     requesterId: z.number(),
+    receiverShiftId: z.number().optional(),
 });
 
 

@@ -121,6 +121,7 @@ export const swapRequests = pgTable("swap_requests", {
     userShiftId: integer().references(() => usersShifts.id),
     shiftId: integer().references(() => shifts.id).notNull(),
     targetUserId: integer().references(() => users.id),
+    receiverShiftAssignmentId: integer().references(() => usersShifts.id),
     status: swapRequestsStatusEnum().notNull().default("pending"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull().default(sql`now() + interval '1 hour'`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
