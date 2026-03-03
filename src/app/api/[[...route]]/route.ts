@@ -253,6 +253,13 @@ const appRoutes = app
     const list = await ShiftController.getShifts(weekStart ?? undefined, weekEnd ?? undefined);
     return c.json(list);
   })
+  .get("/shifts/overtime-costs", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
+    const weekStart = c.req.query("weekStart");
+    const weekEnd = c.req.query("weekEnd");
+    if (!weekStart || !weekEnd) return c.json({ error: "Week start and end are required" }, 400);
+    const costs = await ShiftController.getOverTimeCostsForWeeklySchedule(weekStart, weekEnd);
+    return c.json({ costs });
+  })
   .get("/shifts/:id", checkAuthMiddleware, allowOnlyManagerMiddleware, async (c) => {
     const id = Number(c.req.param("id"));
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);

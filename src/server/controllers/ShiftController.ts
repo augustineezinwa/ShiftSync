@@ -5,7 +5,7 @@ import { toZonedTime } from "date-fns-tz";
 import { HTTPException } from "hono/http-exception";
 import { and, eq, inArray } from "drizzle-orm";
 import { getQualifiedUsersForShift } from "../utils/qualifiedList";
-import { getDateInTimezone } from "../utils/timezone";
+import { getDateInTimezone, getWeeklyProjectedOvertimeCost } from "../utils/timezone";
 
 type Shift = typeof shifts.$inferSelect & {
     location: typeof locations.$inferSelect | null;
@@ -362,6 +362,11 @@ class ShiftController {
                 }
             }
         });
+    }
+
+    static async getOverTimeCostsForWeeklySchedule(weekStart: string, weekEnd: string) {
+        const shifts = await ShiftController.getShifts(weekStart, weekEnd);
+        return getWeeklyProjectedOvertimeCost(shifts);
     }
 }
 

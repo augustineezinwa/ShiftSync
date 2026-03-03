@@ -1,5 +1,15 @@
 import { addDays, format, parseISO, subDays } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
+import { locations, shifts, skills, users } from "../db/schema";
+
+const WEEKLY_LIMIT = 40;
+const OVERTIME_MULTIPLIER = 1;
+
+type Shift = typeof shifts.$inferSelect & {
+  location: typeof locations.$inferSelect | null;
+  skill: typeof skills.$inferSelect | null;
+  users: typeof users.$inferSelect[];
+};
 
 /**
  * Parse a datetime string as local time in the given IANA timezone and return a UTC Date.
@@ -63,4 +73,32 @@ export function getWeekRangeInTimezone(utcDate: Date | string, timezone: string)
   const weekStart = format(subDays(parseISO(dateStr), daysFromMonday), "yyyy-MM-dd");
   const weekEnd = format(addDays(parseISO(weekStart), 6), "yyyy-MM-dd");
   return { start: weekStart, end: weekEnd };
+}
+
+
+
+
+export function getWeeklyProjectedOvertimeCost(shifts: Shift[]) {
+  const userMap = new Map<number, { hours: number; rate: number }>();
+
+  shifts.forEach(s => {
+    const hours = durationHours(new Date(s.startTime), new Date(s.endTime));
+
+    for (const user of s.users) {
+      if (!userMap.has(user.id)) {
+        userMap.set(user.id, { hours, rate: user.hourlyRate || 0 });
+      } else {
+        userMap.get(user.id)!.hours += hours;
+      }
+    }
+  });
+
+  let totalOvertimeCost = 0;
+
+  for (const { hours, rate } of Array.from(userMap.values())) {
+    const overtimeHours = Math.max(hours - WEEKLY_LIMIT, 0);
+    totalOvertimeCost += overtimeHours * rate * OVERTIME_MULTIPLIER;
+  }
+
+  return { totalOvertimeCost, overtimeHours: totalOvertimeCost / OVERTIME_MULTIPLIER };
 }
