@@ -27,13 +27,21 @@ class ShiftController {
         endTime: Date,
         headcount: number
     ) {
-        const [shift] = await db
+        const shift = await db.query.shifts.findFirst({
+            with: {
+                users: true,
+            },
+            where: {
+                id,
+            },
+        });
+        await db
             .update(shifts)
             .set({ locationId, skillId, startTime, endTime, headcount })
             .where(eq(shifts.id, id))
             .returning();
 
-        event.emit(SHIFT_CHANGED, { shiftId: id });
+        event.emit(SHIFT_CHANGED, { shiftId: shift?.id ?? 0, userIds: shift?.users.map(user => user.id) ?? [] });
 
         await db
             .update(swapRequests)
@@ -173,7 +181,7 @@ class ShiftController {
 
         const targetUserIds = updatedRequests.map(request => request.targetUserId).filter(Boolean);
         const requesterIds = updatedRequests.map(request => request.requesterId).filter(Boolean);
-        event.emit(SHIFT_CHANGED, { shiftId, userId });
+        event.emit(SHIFT_CHANGED, { shiftId, userIds: [userId] });
         event.emit(SWAP_REQUEST_UPDATED, { targetUserIds, requesterIds });
         return ShiftController.getShift(shiftId);
     }

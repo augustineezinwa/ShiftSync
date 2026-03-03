@@ -40,6 +40,8 @@ import RequestController from "@/server/controllers/RequestController";
 import { validateRequestWriteMiddleware } from "@/server/middlewares/validateRequestWrite";
 import { enforceLimitOnRequestMiddleware } from "@/server/middlewares/enforceLimitOnRequest";
 import NotificationController from "@/server/controllers/NotificationController";
+import DutyController from "@/server/controllers/DutyController";
+import { createDutySchema } from "@/server/validations/duty";
 
 type Bindings = {
   db: typeof db
@@ -162,6 +164,18 @@ const appRoutes = app
     if (Number.isNaN(id)) return c.json({ error: "Invalid id" }, 400);
     const notification = await NotificationController.updateNotification(id);
     return c.json(notification);
+  })
+  .get("/duties", checkAuthMiddleware, async (c) => {
+    const userId = c.get("userId");
+    const duties = await DutyController.getMyDuties(userId);
+    return c.json(duties);
+  })
+  .post("/duties", validate(createDutySchema), checkAuthMiddleware, async (c) => {
+    const { shiftId } = c.req.valid("json");
+    const userId = c.get("userId");
+    const duty = await DutyController.createDuty(userId, shiftId);
+    if (!duty) return c.json({ error: "Shift assignment not found or already clocked in" }, 400);
+    return c.json(duty);
   })
   .post("/me/availability", validate(createUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
     const { dayOfWeek, startTime, endTime } = await c.req.json();

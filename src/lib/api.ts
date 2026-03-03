@@ -319,6 +319,28 @@ export async function getMyShifts(params?: { weekStart?: string; weekEnd?: strin
     return res.json();
 }
 
+/** Current user's duty (clock-in) records. Each has shiftId for matching. */
+export async function getDuties() {
+    const res = await fetch("/api/duties", { credentials: "include" });
+    if (!res.ok) throw new Error("Failed to fetch duties");
+    return res.json();
+}
+
+/** Clock in for a shift. Creates an on_duty record. */
+export async function createDuty(shiftId: number) {
+    const res = await fetch("/api/duties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ shiftId }),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to clock in");
+    }
+    return res.json();
+}
+
 /** Shifts the current user is allowed to swap (staff). */
 export async function getMyQualifiedShifts() {
     const res = await fetch("/api/me/shifts/qualified", { credentials: "include" });
