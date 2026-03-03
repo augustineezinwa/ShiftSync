@@ -2,10 +2,12 @@ import { db } from "@/server/db";
 import { usersAvailability } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { asc } from "drizzle-orm";
+import { event, STAFF_AVAILABILITY_CHANGED } from "../events";
 
 class UserAvailabilityController {
     static async createUserAvailability(userId: number, dayOfWeek: number, startTime: string, endTime: string, isActive = true) {
         const [row] = await db.insert(usersAvailability).values({ userId, dayOfWeek, startTime, endTime, isActive }).returning();
+        event.emit(STAFF_AVAILABILITY_CHANGED, { userId });
         return row;
     }
 
@@ -23,6 +25,7 @@ class UserAvailabilityController {
         const [existing] = await db.select().from(usersAvailability).where(and(eq(usersAvailability.userId, userId), eq(usersAvailability.dayOfWeek, dayOfWeek))).limit(1);
         if (existing) {
             const [updated] = await db.update(usersAvailability).set({ isActive, startTime, endTime }).where(and(eq(usersAvailability.userId, userId), eq(usersAvailability.dayOfWeek, dayOfWeek))).returning();
+            event.emit(STAFF_AVAILABILITY_CHANGED, { userId });
             return updated;
         }
         return this.createUserAvailability(userId, dayOfWeek, startTime, endTime, isActive);
