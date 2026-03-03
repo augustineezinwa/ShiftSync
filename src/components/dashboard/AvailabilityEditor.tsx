@@ -47,18 +47,18 @@ export function AvailabilityEditor({ initial }: AvailabilityEditorProps) {
     setSaving(true);
     setError(null);
     try {
-      const payloads = DAYS_OF_WEEK.map((day) => {
+      const availabilityPayload = DAYS_OF_WEEK.map((day) => {
         const value = availability[day];
         const isActive = value !== undefined && value !== null;
         const dayOfWeek = DAY_OF_WEEK_INDEX[day];
-        return updateMeAvailability({
+        return {
           dayOfWeek,
           isActive,
           startTime: isActive ? value!.start : "00:00",
           endTime: isActive ? value!.end : "00:00",
-        });
+        };
       });
-      await Promise.all(payloads);
+      await updateMeAvailability({ availability: availabilityPayload });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save availability");
     } finally {

@@ -16,7 +16,7 @@ import SkillController from "@/server/controllers/SkillController";
 import { assignLocationToUserSchema, createLocationSchema, updateLocationSchema } from "@/server/validations/location";
 import { LocationController } from "@/server/controllers/LocationController";
 import UserAvailabilityController from "@/server/controllers/UserAvailabilityController";
-import { createUserAvailabilitySchema, updateUserAvailabilitySchema } from "@/server/validations/availability";
+import { createUserAvailabilitySchema, putAvailabilitySchema, updateUserAvailabilitySchema } from "@/server/validations/availability";
 import { updateUserWeeklyHoursSchema } from "@/server/validations/userSetting";
 import UserSettingController from "@/server/controllers/UserSettingController";
 import { allowOnlyManagerMiddleware } from "@/server/middlewares/allowOnlyManager";
@@ -172,13 +172,13 @@ const appRoutes = app
   .get("/me/availability", checkAuthMiddleware, async (c) => {
     const userId = c.get("userId");
     const list = await UserAvailabilityController.getUserAvailabilities(userId);
-    return c.json(list);
+    return c.json({ availability: list });
   })
-  .put("/me/availability", validate(updateUserAvailabilitySchema), checkAuthMiddleware, async (c) => {
-    const { dayOfWeek, startTime, endTime, isActive } = await c.req.json();
+  .put("/me/availability", validate(putAvailabilitySchema), checkAuthMiddleware, async (c) => {
+    const { availability } = c.req.valid("json");
     const userId = c.get("userId");
-    const userAvailability = await UserAvailabilityController.updateUserAvailability(userId, dayOfWeek, isActive, startTime, endTime);
-    return c.json(userAvailability);
+    const list = await UserAvailabilityController.replaceUserAvailabilities(userId, availability);
+    return c.json({ availability: list });
   })
   .put("/me/weekly-hours", validate(updateUserWeeklyHoursSchema), checkAuthMiddleware, async (c) => {
     const { hoursPerWeek } = await c.req.json();

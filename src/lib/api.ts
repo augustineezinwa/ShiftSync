@@ -88,18 +88,20 @@ export const MY_NOTIFICATIONS_QUERY_KEY = ["me", "notifications"] as const;
 
 // --- Me availability (staff profile) ---
 
-export async function getMeAvailability() {
+export interface AvailabilityItem {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+}
+
+export async function getMeAvailability(): Promise<{ availability: AvailabilityItem[] }> {
     const res = await api.me.availability.$get();
-    if (!res.ok) return [];
+    if (!res.ok) return { availability: [] };
     return res.json();
 }
 
-export async function updateMeAvailability(payload: {
-    dayOfWeek: number;
-    isActive: boolean;
-    startTime: string;
-    endTime: string;
-}) {
+export async function updateMeAvailability(payload: { availability: AvailabilityItem[] }) {
     const res = await api.me.availability.$put({ json: payload });
     if (!res.ok) throw new Error("Failed to update availability");
     return res.json();
